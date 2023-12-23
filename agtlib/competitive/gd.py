@@ -7,7 +7,8 @@ from ..utils.exceptions import GradDisabledException, StrategyNotInSimplexExcept
 class VanillaGradientDescent:
     """
     Implementation of Vanilla Gradient Descent. For more details on its theory, view 
-    `Theory.gd`
+    `Theory.gd`. Algorithm pseudocode sourced from 
+    https://panageas.github.io/agt23slides/L10%20Other%20equilibrium%20notions.pdf.
     """
     
     def __init__(self, num_actions: int, initial: torch.Tensor = None, stepsize = 0.01) -> None:
@@ -18,8 +19,8 @@ class VanillaGradientDescent:
             The number of actions in the action space for the player performing Gradient Descent. 
         initial: torch.Tensor, optional
             The initial strategy for the player.
-                 Must be in the simplex, i.e. sum to 1 and be nonnegative. Defaults to a uniform distribution over the number of actions.
-                 Must have `requires_grad = True`, or else a `GradDisabledException` will be raised. 
+                Must be in the simplex, i.e. sum to 1 and be nonnegative. Defaults to a uniform distribution over the number of actions.
+                Must have `requires_grad = True`, or else a `GradDisabledException` will be raised. 
         stepsize: int, float or other scalar representation
             The stepsize for gradient descent. Defaults to 0.01.
 
@@ -40,8 +41,10 @@ class VanillaGradientDescent:
         else:
             self.current = initial
 
-        if not (np.isscalar(stepsize) and stepsize > 0):
-            raise ValueError("Parameter 'stepsize' is not a scalar greater than 0")
+        if not (stepsize > 0):
+            raise ValueError("Parameter 'stepsize' is not nonnegative")
+        elif not np.isscalar(stepsize):
+            raise TypeError("Parameter 'stepsize' is not a scalar")
         else:
             self.stepsize = stepsize
 
