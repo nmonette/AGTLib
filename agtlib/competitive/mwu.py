@@ -17,8 +17,9 @@ class MultiplicativeWeights:
         game: numpy.ndarray
             Payoff matrix for the player performing Multiplicative Weights Update. 
             Assumes active player is the row player. 
-        stepsize: int, float or other scalar representation
-            The stepsize for gradient descent. Defaults to 0.01.
+        stepsize: int, float or other scalar representation, optional
+            The stepsize for gradient descent. Defaults to 0.01. Must be in the range 
+            (0, 0.5].
         """
         if not isinstance(game, np.ndarray):
             raise TypeError("Parameter 'game' is not type numpy.ndarray")
@@ -36,7 +37,7 @@ class MultiplicativeWeights:
 
     def step(self, c_action: int) -> bool:
         """
-        Updates `self.current` with the next gradient step. 
+        Updates `self.current` with the next set of weights. 
 
         Parameters
         ----------
@@ -46,7 +47,7 @@ class MultiplicativeWeights:
         Returns
         -------
         bool
-            True if the algorithm has converged.
+            True if the algorithm has converged (up to a limited point of precision).
         """
 
         if not isinstance(c_action, int):
@@ -54,11 +55,15 @@ class MultiplicativeWeights:
         if not 0 <= c_action <= self.game.shape[0]:
             raise ValueError("Parameter 'c_action' is not in the range [0, number of actions)")
         
+        prev = self.current.clone()
+
         for i in range(len(self.current)):
             if self.game[i, c_action] >= 0:
                 self.current[i] *= (1-self.stepsize)**(self.game[i, c_action] / self.game.shape[0])
             else:
                 self.current[i] *= (1+self.stepsize)**(-self.game[i, c_action] / self.game.shape[0])
+
+        return torch.equal(prev, self.current)
 
     def get_action(self) -> int:
         """
@@ -67,7 +72,7 @@ class MultiplicativeWeights:
         Returns
         -------
         int
-            Integer representing the integer index of the action samples from the strategy.
+            The integer index of the action samples from the strategy.
         """
         dist = torch.distributions.Categorical(self.get_strategy())
         return dist.sample()

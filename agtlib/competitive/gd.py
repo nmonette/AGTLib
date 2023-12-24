@@ -21,7 +21,7 @@ class VanillaGradientDescent:
             The initial strategy for the player.
                 Must be in the simplex, i.e. sum to 1 and be nonnegative. Defaults to a uniform distribution over the number of actions.
                 Must have `requires_grad = True`, or else a `GradDisabledException` will be raised. 
-        stepsize: int, float or other scalar representation
+        stepsize: int, float or other scalar representation, optional
             The stepsize for gradient descent. Defaults to 0.01.
 
         """
@@ -54,13 +54,13 @@ class VanillaGradientDescent:
 
         Parameters
         ----------
-        utility: int, float or other scalar representation.
+        utility: int, float or other scalar representation
             The player's utility at the current time-step.
 
         Returns
         -------
         bool
-            True if the algorithm has converged
+            True if the algorithm has converged (up to a limited point of precision).
         """
         if not np.isscalar(utility):
             raise ValueError("Parameter 'utility' is not a scalar")
@@ -83,7 +83,7 @@ class VanillaGradientDescent:
         Returns
         -------
         int
-            Integer representing the integer index of the action samples from the strategy.
+            The integer index of the action samples from the strategy.
         """
         dist = torch.distributions.Categorical(self.current)
         return dist.sample()
@@ -97,7 +97,7 @@ class VanillaGradientDescent:
         torch.Tensor
             Probability vector containing the action-probabilities.
         """
-        return self.current
+        return self.current.data
 
 
 

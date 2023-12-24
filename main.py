@@ -1,5 +1,5 @@
 import numpy as np
-from ...agtlib.competitive.mwu import MultiplicativeWeights 
+from agtlib.competitive.mwu import MultiplicativeWeights 
 
 if __name__ == "__main__":
     game = np.stack([
