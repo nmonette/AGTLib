@@ -10,6 +10,8 @@ import torch.nn as nn
 
 from typing import Iterable
 
+from abc import ABC, abstractmethod
+
 class PolicyNetwork(nn.Module):
     """
     Feedforward neural network that serves
@@ -228,7 +230,7 @@ class LinearQ(nn.Module):
             raise TypeError("Parameter 'x' is not type torch.Tensor")
         return self.line(self.feature_mapping(x))
 
-class RLBase:
+class RLBase(ABC):
     """
     Base class for RL models to override.
     """
@@ -328,7 +330,7 @@ class RLBase:
 
         self.policy = PolicyNetwork(obs_size, action_size, policy_hl_dims)
         
-
+    @abstractmethod
     def step(self, utility: int) -> None:
         """
         Updates weights of policy and value networks. 
@@ -340,7 +342,7 @@ class RLBase:
         """
         pass
 
-    def get_action(self) -> int:
+    def get_action(self, obs) -> int:
         """
         Samples an action from the current policy and returns it as an integer index.
 
@@ -351,5 +353,9 @@ class RLBase:
         float
             Log probability of the returned action with reference to the current policy.
         """
-        pass
+        dist = torch.distributions.Categorical(self.policy.forward(obs))
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        
+        return action, log_prob
 
