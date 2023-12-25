@@ -22,18 +22,13 @@ class VanillaGradientDescent:
                 Must be in the simplex, i.e. sum to 1 and be nonnegative. Defaults to a uniform distribution over the number of actions.
                 Must have `requires_grad = True`, or else a `GradDisabledException` will be raised. 
         stepsize: int, float or other scalar representation, optional
-            The stepsize for gradient descent. Defaults to 0.01.
+            The stepsize for gradient descent. Defaults to `0.01`.
 
         """
-        if not isinstance(num_actions, int) and num_actions > 0:
-            raise ValueError("Parameter num_actions is not an integer greater than 0")
-        else:
-            self.num_actions = num_actions
+        self.num_actions = num_actions
         
         if initial is None:
             self.current = torch.tensor([1/num_actions for _ in range(num_actions)], requires_grad=True)
-        elif not isinstance(initial, torch.Tensor):
-            raise TypeError("Parameter 'initial' must be type torch.Tensor")
         elif not initial.requires_grad:
             raise GradDisabledException("initial")
         elif torch.sum(initial).item() != 1 or torch.any(torch.lt(initial, 0)).item():
@@ -43,8 +38,6 @@ class VanillaGradientDescent:
 
         if not (stepsize > 0):
             raise ValueError("Parameter 'stepsize' is not nonnegative")
-        elif not np.isscalar(stepsize):
-            raise TypeError("Parameter 'stepsize' is not a scalar")
         else:
             self.stepsize = stepsize
 
@@ -62,8 +55,6 @@ class VanillaGradientDescent:
         bool
             True if the algorithm has converged (up to a limited point of precision).
         """
-        if not np.isscalar(utility):
-            raise ValueError("Parameter 'utility' is not a scalar")
 
         loss = torch.tensor(-utility, requires_grad = True, dtype=torch.float64) # -utility #
         loss.backward()

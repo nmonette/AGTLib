@@ -4,13 +4,12 @@ Some utility objects that will be used, as well as
 base classes to inherit from.
 """
 
+from typing import Iterable
+from abc import ABC, abstractmethod
+
 import numpy as np
 import torch
 import torch.nn as nn
-
-from typing import Iterable
-
-from abc import ABC, abstractmethod
 
 class PolicyNetwork(nn.Module):
     """
@@ -26,7 +25,7 @@ class PolicyNetwork(nn.Module):
             The length of the flattened observation of the agent(s). 
         action_size: int
             The cardinality of the action space of a single agent. 
-        hl_dims: iterable(int), optional
+        hl_dims: Iterable(int), optional
             An iterable such that the ith element represents the width of the ith hidden layer. 
             Defaults to `[64,128]`. Note that this does not include the input or output layers.
         """
@@ -53,11 +52,33 @@ class PolicyNetwork(nn.Module):
         """
         if len(x.shape) != 1:
             raise ValueError("Parameter 'x' is not a flattened tensor")
-        elif isinstance(x, torch.Tensor):
-            raise TypeError("Parameter 'x' is not type torch.Tensor")
         for i in range(len(self.layers) - 1):
             x = torch.relu(self.layers[i](x))
         return self.layers[-1](x)
+
+    @torch.no_grad()
+    def get_action(self, x: torch.Tensor) -> int:
+        """
+        Samples an action from the current policy and returns it as an integer index.
+        Parameters
+        ----------
+        x: torch.Tensor
+            The flattened observation of the agent(s).
+        Returns
+        -------
+        int
+            The integer index of the action samples from the policy.
+        float
+            The log probability of the returned action with reference to the current policy.
+        """
+        if len(x.shape) != 1:
+            raise ValueError("Parameter 'x' is not a flattened tensor")
+
+        dist = torch.distributions.Categorical(self.policy.forward(x))
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        
+        return action, log_prob
 
 
 class ValueNetwork(nn.Module):
@@ -72,7 +93,7 @@ class ValueNetwork(nn.Module):
         ----------
         obs_size: int
             The length of the flattened observation of the agent(s). 
-        hl_dims: iterable(int), optional
+        hl_dims: Iterable(int), optional
             An iterable such that the ith element represents the width of the ith hidden layer. 
             Defaults to `[64,128]`. Note that this does not include the input or output layers.
         """
@@ -100,8 +121,6 @@ class ValueNetwork(nn.Module):
         """
         if len(x.shape) != 1:
             raise ValueError("Parameter 'x' is not a flattened tensor")
-        elif isinstance(x, torch.Tensor):
-            raise TypeError("Parameter 'x' is not type torch.Tensor")
         for i in range(len(self.layers) - 1):
             x = torch.relu(self.layers[i](x))
         return nn.Softmax(-1)(self.layers[-1](x))
@@ -141,8 +160,6 @@ class LinearValue(nn.Module):
         """
         if len(x.shape) != 1:
             raise ValueError("Parameter 'x' is not a flattened tensor")
-        elif isinstance(x, torch.Tensor):
-            raise TypeError("Parameter 'x' is not type torch.Tensor")
         return self.line(self.feature_mapping(x))
 
 class QNetwork(nn.Module):
@@ -157,7 +174,7 @@ class QNetwork(nn.Module):
         ----------
         obs_size: int
             The length of the flattened observation of the agent(s). 
-        hl_dims: iterable(int), optional
+        hl_dims: Iterable(int), optional
             An iterable such that the ith element represents the width of the ith hidden layer. 
             Defaults to `[64,128]`. Note that this does not include the input or output layers.
         """
@@ -185,8 +202,6 @@ class QNetwork(nn.Module):
         """
         if len(x.shape) != 1:
             raise ValueError("Parameter 'x' is not a flattened tensor")
-        elif isinstance(x, torch.Tensor):
-            raise TypeError("Parameter 'x' is not type torch.Tensor")
         for i in range(len(self.layers) - 1):
             x = torch.relu(self.layers[i](x))
         return nn.Softmax(-1)(self.layers[-1](x))
@@ -226,8 +241,6 @@ class LinearQ(nn.Module):
         """
         if len(x.shape) != 1:
             raise ValueError("Parameter 'x' is not a flattened tensor")
-        elif isinstance(x, torch.Tensor):
-            raise TypeError("Parameter 'x' is not type torch.Tensor")
         return self.line(self.feature_mapping(x))
 
 class RLBase(ABC):
@@ -235,7 +248,7 @@ class RLBase(ABC):
     Base class for RL models to override.
     """
     def __init__(self, action_size: int, obs_size: int, *, v_obs_size: int = None, policy_hl_dims: Iterable[int, ] = [64,128], \
-                 value_hl_dims: Iterable[int, ] = [64, 128], linear_value: bool = False, value_type: str = "V") -> None:
+                 value_hl_dims: Iterable[int, ] = [64, 128], linear_value: bool = False, value_type: str = "V", gamma: float = 0.99) -> None:
         """
         Parameters
         ----------
@@ -248,11 +261,11 @@ class RLBase(ABC):
             Only specify if different from policy `obs_size` (e.g. the 
             policy network uses locallized observations, but the value 
             network uses the joint observation of multiple agents).
-        policy_hl_dims: iterable(int), optional, keyword only
+        policy_hl_dims: Iterable(int), optional, keyword only
             An iterable such that the ith element represents the width of the ith hidden layer
             of the policy network. Defaults to `[64,128]`. Note that this does not include the 
             input or output layers.
-        value_hl_dims: iterable(int), optional, keyword only
+        value_hl_dims: Iterable(int), optional, keyword only
             An iterable such that the ith element represents the width of the ith hidden layer
             of the value network. Defaults to `[64,128]`. Note that this does not include the 
             input or output layers. Must be length 1 if linear_value is enabled, with the value 
@@ -263,61 +276,39 @@ class RLBase(ABC):
         value_type: str, optional, keyword only
             Indicates which value function to use (i.e. Q or V). Only accepts arguments in `{"Q","V"}.
             Defaults to `"V"`.
+        gamma: float, optional, keyword only
+            The discount factor to be used in the calculation of expectations. Must be in the range
+            `[0,1]` for (finite time horizons). Defaults to `0.99`.
         """
-        if not isinstance(action_size, int):
-            raise TypeError("Parameter 'action_size' is not type integer")
-        elif action_size < 1:
-            raise ValueError("Parameter 'action_size' is not type integer > 1")
-        else:
-            self.action_size = action_size
-        
-        if not isinstance(obs_size, int):
-            raise TypeError("Parameter 'obs_size' is not type integer")
-        elif obs_size < 1:
-            raise ValueError("Parameter 'obs_size' is not an integer > 1")
-        else:
-            self.obs_size = obs_size
+        self.action_size = action_size  
+        self.obs_size = obs_size
 
         if v_obs_size is None:
             self.v_obs_size = obs_size
-        elif not isinstance(v_obs_size, int):
-            raise TypeError("Parameter 'v_obs_size' is not type integer")
-        elif v_obs_size < 1:
-            raise ValueError("Parameter 'v_obs_size' is not an integer > 1")
         else:
             self.v_obs_size = v_obs_size
 
         if not isinstance(policy_hl_dims, Iterable):
             raise TypeError("Parameter 'policy_hl_dims' is not type iterable")
-        elif not all([isinstance(i, int) for i in range(policy_hl_dims)]):
-            raise TypeError("Parameter 'policy_hl_dims' does not contain all integers")
-        elif all([i > 0 for i in range(policy_hl_dims)]):
-            raise ValueError("Parameter 'policy_hl_dims' does not contain all positive integers")
         else:
             self.policy_hl_dims = policy_hl_dims
 
-        if not isinstance(value_hl_dims, Iterable):
-            raise TypeError("Parameter 'value_hl_dims' is not type iterable")
-        elif not all([isinstance(i, int) for i in range(value_hl_dims)]):
-            raise TypeError("Parameter 'value_hl_dims' does not contain all integers")
-        elif linear_value and len(value_hl_dims) != 1:
+        if linear_value and len(value_hl_dims) != 1:
             raise ValueError("Parameter 'value_hl_dims' must have length 1 when 'linear_value' is True")
-        elif all([i > 0 for i in range(value_hl_dims)]):
-            raise ValueError("Parameter 'value_hl_dims' does not contain all positive integers")
         else:
             self.value_hl_dims = value_hl_dims
         
-        if not isinstance(linear_value, bool):
-            raise TypeError("Parameter 'linear_value' is not type bool")
-        else:
-            self.linear_value = linear_value
+        self.linear_value = linear_value
         
-        if not isinstance(value_type, str):
-            raise TypeError("Parameter 'value_type' is not type str")
-        elif value_type not in {"Q", "V"}:
+        if value_type not in {"Q", "V"}:
             raise ValueError("Parameter 'value_type' not 'Q' or 'V'")
         else:
             self.value_type = value_type
+
+        if not (0 <= gamma <= 1):
+            raise ValueError("Parameter 'gamma' is not in the range [0,1]")
+        else:
+            self.gamma = gamma
 
         if self.value_type == 'V' and self.linear_value:
             self.value = LinearValue(v_obs_size, value_hl_dims)
@@ -331,31 +322,14 @@ class RLBase(ABC):
         self.policy = PolicyNetwork(obs_size, action_size, policy_hl_dims)
         
     @abstractmethod
-    def step(self, utility: int) -> None:
+    def step(self, utility) -> None:
         """
         Updates weights of policy and value networks. 
 
         Parameters
         ----------
-        utility: int
-            Observed utility at the current time step.
+        utility: int, float or other scalar representation
+            The agent's utility at the current time step
         """
         pass
-
-    def get_action(self, obs) -> int:
-        """
-        Samples an action from the current policy and returns it as an integer index.
-
-        Returns
-        -------
-        int
-            The integer index of the action samples from the policy.
-        float
-            Log probability of the returned action with reference to the current policy.
-        """
-        dist = torch.distributions.Categorical(self.policy.forward(obs))
-        action = dist.sample()
-        log_prob = dist.log_prob(action)
-        
-        return action, log_prob
 

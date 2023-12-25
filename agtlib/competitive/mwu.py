@@ -18,20 +18,15 @@ class MultiplicativeWeights:
             Payoff matrix for the player performing Multiplicative Weights Update. 
             Assumes active player is the row player. 
         stepsize: int, float or other scalar representation, optional
-            The stepsize for gradient descent. Defaults to 0.01. Must be in the range 
-            (0, 0.5].
+            The stepsize for gradient descent. Defaults to `0.01`. Must be in the range 
+            `(0, 0.5]`.
         """
-        if not isinstance(game, np.ndarray):
-            raise TypeError("Parameter 'game' is not type numpy.ndarray")
-        else:
-            self.game = game
+        self.game = game
     
         self.current = torch.ones(self.game.shape[0])
 
         if not (0 < stepsize <= 0.5):
             raise ValueError("Parameter 'stepsize' is not in the range (0,0.5]")
-        elif not np.isscalar(stepsize):
-            raise TypeError("Parameter 'stepsize' is not a scalar")
         else:
             self.stepsize = stepsize
 
@@ -50,8 +45,6 @@ class MultiplicativeWeights:
             True if the algorithm has converged (up to a limited point of precision).
         """
 
-        if not isinstance(c_action, int):
-            raise TypeError("Parameter 'c_action' is not an integer")
         if not 0 <= c_action <= self.game.shape[0]:
             raise ValueError("Parameter 'c_action' is not in the range [0, number of actions)")
         
