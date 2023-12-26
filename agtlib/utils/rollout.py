@@ -49,7 +49,7 @@ class RolloutManager:
     Implementation of monte carlo rollouts for the Generalized Advantage Estimation method. For 
     more details, refer to the paper https://arxiv.org/abs/1506.02438. Implementation heavily 
     inspired by the OpenAI stable baselines: https://github.com/DLR-RM/stable-baselines3. Also
-    used the "37 implementation details for PPO" blog post as a reference.
+    used the https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/ blog post as a reference.
     """
     def __init__(self, rollout_length: int, env: gym.Env, policies: Iterable[PolicyNetwork, ], values: Iterable[ValueNetwork | LinearValue, ], policy_groups: Iterable[PolicyNetwork, ] = None, value_groups: Iterable[PolicyNetwork, ] = None, gamma: float = 0.99, lambda_: float = 0.95) -> None:
         """

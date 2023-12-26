@@ -27,3 +27,17 @@ class PPO(RLBase):
     def step(self, buffer: RolloutBuffer) -> None:
         pass
 
+class MAPPO:
+    ## TO DO: fix this, code was written for sake of explanation
+    def __init__(self, teams: [int, ], env: gym.Env):
+        self.policy_groups = teams
+
+        self.policies = [PolicyNetwork(...) for i in range(len(set(teams)))]
+
+        self.rollout = RolloutManger(self.policies...)
+
+    def train(self):
+        for i in range(epochs):
+            data = self.rollout.rollout()
+            for j in range(len()):
+                self.policies.train(data[j])
