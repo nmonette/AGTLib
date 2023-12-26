@@ -4,12 +4,14 @@ Some utility objects that will be used, as well as
 base classes to inherit from.
 """
 
-from typing import Iterable
+from typing import Iterable, DefaultDict
 from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.optim import Adam
+
 
 class PolicyNetwork(nn.Module):
     """
