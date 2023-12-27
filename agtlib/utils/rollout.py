@@ -119,12 +119,13 @@ class RolloutManager:
         at each time step of the episode.
         Returns
         -------
+
         Dict(int: [int, ])
-            Dictionary such that each key corresponds to a value function and 
-            the ith element of the corresponding list is a list of the advantage
-            estimates of the ith episode. 
+            Dictionary such that each key corresponds to a rollout buffer.
         """
-        buffer = RolloutBuffer(defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list))
+        buffers = [RolloutBuffer(defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)) \
+                   for _ in range(len(self.policy_groups))]
+        
         for i in range(self.rollout_length):
             obs, _ = self.env.reset()
 
@@ -151,15 +152,14 @@ class RolloutManager:
                     break
 
             episode_advs = self.calculate_adv(states, rewards)
-            for i in range(len(episode_advs)):
-                buffer.adv_buffer[i].append(episode_advs[i])
-            for i in range(len(states)):
-                buffer.obs_buffer[i].append(states[i])
-                buffer.log_prob_buffer[i].append(log_probs[i])
-                buffer.action_buffer[i].append(actions[i])
-                buffer.reward_buffer[i].append(rewards[i])
+            for i in range(len(self.policy_groups)):
+                buffers[i].adv_buffer.append(episode_advs[self.value_groups[i]])
+                buffers[i].obs_buffer.append(states[i])
+                buffers[i].log_prob_buffer.append(log_probs[i])
+                buffers[i].action_buffer.append(actions[i])
+                buffers[i].reward_buffer.append(rewards[i])
 
-        return buffer
+        return buffers
 
     def get_data(self, batch_size: int):
         pass

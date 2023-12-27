@@ -6,12 +6,12 @@
 1. Finish single agent PPO first 
 2. Add child classes to PPO (MAPPO, IPPO)
 ## Trainer Classes
-1. Add classes that will train two teams against each other
-2. Team-PSRO, FXP
+1. Add classes that will train two teams against each other, including running the rollout manager and then passing the buffers
+2. Team-PSRO, FXP, Self-PLay
 ## General
 1. Add multithreading capabilities for rollouts
 ## Other Algorithms
-1. MA-POCA + (REINFORCE?)
+1. MA-POCA with (REINFORCE?)
     - we can also try doing it with a PPO update
 2. HAPPO
 3. Multi-Agent A3C (?)

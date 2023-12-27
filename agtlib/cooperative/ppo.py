@@ -3,9 +3,10 @@ from typing import Iterable
 import numpy as np
 import torch
 import torch.nn as nn
+import gymnasium as gym
 
-from .base import RLBase
-from ..utils.rollout import RolloutBuffer
+from .base import RLBase, PolicyNetwork
+from ..utils.rollout import RolloutBuffer, RolloutManager
 
 class PPO(RLBase):
     """
@@ -31,6 +32,8 @@ class PPO(RLBase):
     
     def step(self, buffer: RolloutBuffer) -> None:
         pass
+    # note that the "old" policy is the policy from the last 
+    # minibatch, NOT the last rolloutå
 
 
 
@@ -41,13 +44,13 @@ class MAPPO(PPO):
 
         self.policies = [PolicyNetwork(...) for i in range(len(set(teams)))]
 
-        self.rollout = RolloutManger(self.policies...)
+        self.rollout = RolloutManager(self.policies...)
 
     def train(self):
         for i in range(epochs):
             data = self.rollout.rollout()
             for j in range(len()):
-                self.policies.train(data[j])
+                self.policies[j].train(data[j])
 
 class IPPO:
     pass
