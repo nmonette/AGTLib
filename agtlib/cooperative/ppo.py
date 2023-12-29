@@ -26,7 +26,7 @@ class PPO(RLBase):
             self.lambda_ = lambda_
         
         if not (0 <= clip_range < 1):
-            raise ValueError("Parameter 'clip_range' is not in the range `[0,1)lkjnlkjnsk`")
+            raise ValueError("Parameter 'clip_range' is not in the range `[0,1)`")
         else:
             self.clip_range = clip_range
     

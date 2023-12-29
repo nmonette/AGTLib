@@ -11,36 +11,13 @@ class RolloutBuffer:
     Class to hold all of the data from a rollout.  The adv_buffer holds the form 
     {value_fn_index: [[value, ], ]}
     """
-    def __init__(self, obs_buffer: DefaultDict[int, List[int, ]], log_prob_buffer: DefaultDict[int, List[int, ]], action_buffer: DefaultDict[int, List[int, ]], reward_buffer: DefaultDict[int, List[int, ]], adv_buffer: DefaultDict[int, List[int, ]]) -> None:
-        """
-        Parameters
-        ----------
-        obs_buffer: DefaultDict(int: [int, ])
-            Holds the form: `{policy_index: [[value, ],  ]}`, 
-            where the keys are the agents and the innermost list 
-            represents the observations of a single episode. 
-        log_prob_buffer: DefaultDict(int: [int, ])
-            Holds the form: `{policy_index: [[value, ],  ]}`, 
-            where the keys are the agents and the innermost list 
-            represents the log probabilties of a single episode. 
-        action_buffer: DefaultDict(int: [int, ])
-            Holds the form: `{policy_index: [[value, ],  ]}`, 
-            where the keys are the agents and the innermost list 
-            represents the actions of a single episode. 
-        reward_buffer: DefaultDict(int: [int, ])
-            Holds the form: `{policy_index: [[value, ],  ]}`, 
-            where the keys are the agents and the innermost list 
-            represents the reward of a single episode. 
-        adv_buffer: DefaultDict(int: [int, ])
-            Holds the form `{value_fn_index: [[value, ], ]}` where 
-            they keys are the value estimators and the innermost list
-            represents the advantage estimates of a single episode.
-        """
-        self.obs_buffer = log_prob_buffer
-        self.log_prob_buffer = log_prob_buffer
-        self.action_buffer = action_buffer
-        self.reward_buffer = reward_buffer
-        self.adv_buffer = adv_buffer
+    def __init__(self) -> None:
+        self.obs_buffer = defaultdict(list)
+        self.log_prob_buffer = defaultdict(list)
+        self.action_buffer = defaultdict(list)
+        self.reward_buffer = defaultdict(list)
+        self.adv_buffer = defaultdict(list)
+        self.value_buffer = defaultdict(list)
     
 ## TO DO: make it so that we don't have to do multiple dictionaries and then translate, 
 ## just make a RolloutBuffer for each agent or vf so that we can pass it into the update function
@@ -93,25 +70,51 @@ class RolloutManager:
             self.value_groups = value_groups
         
 
-    def calculate_adv(self, states: [dict, ], rewards: [dict, ]) -> Dict[int, List[int, ]]:
+    def calculate_adv(self, states: DefaultDict[int, List[int, ]], rewards: DefaultDict[int, List[int, ]]) -> (Dict[int, List[int, ]], Dict[int, List[int, ]]):
         """
         Calculates the advantages given the states, actions, and rewards of a given episode.
+        Parameters
+        ----------
+        states: DefaultDict(int: [int, ])
+            Dictionary of lists such that each key refers to each agent and the correpsponding 
+            lists hold the agents' respective observations at each time step. 
+        rewards: DefaultDict(int: [int, ])
+            Dictionary of lists such that each key refers to each agent and the correpsponding 
+            lists hold the agents' respective rewards at each time step. 
+        
+        Returns
+        -------
+        DefaultDict(int: [int, ])
+            Dictionary of lists such that each key refers to each agent and the corresponding 
+            lists hold the agents' respective advantage values at each time step.
+        DefaultDict(int: [int, ])
+            Dictionary of lists such that each key refers to each agent and the corresponding 
+            lists hold the agents' respective state-values at each time step.
         """
-        adv = defaultdict(lambda: [0])
+        adv = defaultdict(list)
+        values = defaultdict(list)
+
         if len(self.values) == len(self.value_groups):
             for agent in range(len(self.values)):
                 coef = (self.gamma * self.lambda_)**(len(states) - 1)
-                for t in range(len(states) - 1, -1):
-                    obs = torch.flatten(torch.tensor([states[t][i] for i in range(len(self.value_groups)) if self.value_groups[i] == agent]))
-                    adv[agent].append(adv[agent][len(states) - t - 1] + coef * (rewards[t] + self.gamma * self.values[agent].forward(obs)))
+                for t in range(1, len(states)):
+                    obs = torch.flatten(torch.tensor([states[i][-t] for i in range(len(self.value_groups)) if self.value_groups[i] == agent]))
+                    value1 = values[agent][-t+1] if t != 1 else 0 # V(s_{t+1}) 
+                    value2 = self.values[agent].forward(obs) # V(s_t)
+                    adv[agent].append(adv[agent][-t] + coef * (rewards[-t] + self.gamma * value1 - value2))
+                    values[agent].append(value1)
                     coef /= (self.gamma * self.lambda_)
         else:
-            for agent in range(len(self.values)):
+            for agent in range(len(self.values)): 
                 coef = (self.gamma * self.lambda_)**(len(states) - 1)
-                for t in range(len(states) - 1, -1):
-                    adv[agent].append(adv[agent][len(states) - t - 1] + coef * (rewards[t] + self.gamma * self.values[agent].forward(states[t][agent])))
+                for t in range(1, len(states)): # goes in reverse by utilizing negative indexing
+                    value1 = values[agent][-t+1] if t != 1 else 0 # V(s_{t+1}) 
+                    value2 = self.values[agent].forward(states[agent][-t]) # V(s_t)
+                    adv[agent].append(adv[agent][-t] + coef * (rewards[-t] + self.gamma * value1 - value2))
+                    values[agent].append(value1)
                     coef /= (self.gamma * self.lambda_)
-        return adv
+
+        return {i: adv[i][::-1] for i in range(len(adv))}, {i: adv[i][::-1] for i in range(len(values))}
 
     def rollout(self) -> Dict[int, List[int, ]]:
         """
@@ -121,7 +124,7 @@ class RolloutManager:
         -------
 
         Dict(int: [int, ])
-            Dictionary such that each key corresponds to a rollout buffer.
+            Dictionary such that each key corresponds to an agent, and the key refers to a rollout buffer.
         """
         buffers = [RolloutBuffer(defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)) \
                    for _ in range(len(self.policy_groups))]
@@ -134,7 +137,7 @@ class RolloutManager:
             actions = defaultdict(list)
             rewards = defaultdict(list)
 
-            while True:
+            while True: # completes one episode in the environment
 
                 action = {}
                 for i in range(len(self.policy_groups)): # sampling actions and log probs
@@ -151,9 +154,10 @@ class RolloutManager:
                 if done or trunc:
                     break
 
-            episode_advs = self.calculate_adv(states, rewards)
+            episode_advs, episodes_values = self.calculate_adv(states, rewards)
             for i in range(len(self.policy_groups)):
                 buffers[i].adv_buffer.append(episode_advs[self.value_groups[i]])
+                buffers[i].value_buffer.append(episodes_values[self.value_groups[i]])
                 buffers[i].obs_buffer.append(states[i])
                 buffers[i].log_prob_buffer.append(log_probs[i])
                 buffers[i].action_buffer.append(actions[i])
