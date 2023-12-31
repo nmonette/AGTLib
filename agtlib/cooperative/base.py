@@ -52,10 +52,8 @@ class PolicyNetwork(nn.Module):
         torch.Tensor
             Probability vector containing the action-probabilities.
         """
-        if len(x.shape) != 1:
-            raise ValueError("Parameter 'x' is not a flattened tensor")
         for i in range(len(self.layers) - 1):
-            x = torch.relu(self.layers[i](x))
+            x = torch.nn.ReLU(self.layers[i](x))
         return self.layers[-1](x)
 
     @torch.no_grad()
@@ -124,8 +122,8 @@ class ValueNetwork(nn.Module):
         if len(x.shape) != 1:
             raise ValueError("Parameter 'x' is not a flattened tensor")
         for i in range(len(self.layers) - 1):
-            x = torch.relu(self.layers[i](x))
-        return nn.Softmax(-1)(self.layers[-1](x))
+            x = torch.nn.ReLU(self.layers[i](x))
+        return self.layers[-1](x)
 
 class LinearValue(nn.Module):
     """
@@ -160,8 +158,6 @@ class LinearValue(nn.Module):
         torch.Tensor
             Tensor containing the approximate value of the given state. 
         """
-        if len(x.shape) != 1:
-            raise ValueError("Parameter 'x' is not a flattened tensor")
         return self.line(self.feature_mapping(x))
 
 class QNetwork(nn.Module):
@@ -202,11 +198,9 @@ class QNetwork(nn.Module):
         torch.Tensor
             Probability vector containing the action-probabilities.
         """
-        if len(x.shape) != 1:
-            raise ValueError("Parameter 'x' is not a flattened tensor")
         for i in range(len(self.layers) - 1):
-            x = torch.relu(self.layers[i](x))
-        return nn.Softmax(-1)(self.layers[-1](x))
+            x = torch.nn.ReLU(self.layers[i](x))
+        return self.layers[-1](x)
 
 class LinearQ(nn.Module):
     """
@@ -241,8 +235,6 @@ class LinearQ(nn.Module):
         torch.Tensor
             Tensor containing the approximate value of the given state. 
         """
-        if len(x.shape) != 1:
-            raise ValueError("Parameter 'x' is not a flattened tensor")
         return self.line(self.feature_mapping(x))
 
 class RLBase(ABC):
@@ -319,12 +311,12 @@ class RLBase(ABC):
         elif self.value_type == 'Q' and self.linear_value:
             self.value = LinearQ(v_obs_size, value_hl_dims)
         else:
-            self.value_type = QNetwork(v_obs_size, value_hl_dims)
+            self.value = QNetwork(v_obs_size, value_hl_dims)
 
         self.policy = PolicyNetwork(obs_size, action_size, policy_hl_dims)
         
     @abstractmethod
-    def step(self, utility) -> None:
+    def train(self, utility) -> None:
         """
         Updates weights of policy and value networks. 
 

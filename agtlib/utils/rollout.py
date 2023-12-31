@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import torch
 import gymnasium as gym
+import numpy as np
 
 from ..cooperative.base import PolicyNetwork, ValueNetwork, LinearValue
 
@@ -11,16 +12,73 @@ class RolloutBuffer:
     Class to hold all of the data from a rollout.  The adv_buffer holds the form 
     {value_fn_index: [[value, ], ]}
     """
-    def __init__(self) -> None:
-        self.obs_buffer = defaultdict(list)
-        self.log_prob_buffer = defaultdict(list)
-        self.action_buffer = defaultdict(list)
-        self.reward_buffer = defaultdict(list)
-        self.adv_buffer = defaultdict(list)
-        self.value_buffer = defaultdict(list)
+    def __init__(self, rollout_length: int) -> None: # will add another param for the number of parallel rollouts
+        """
+        Parameters
+        ----------
+        rollout_length: int
+            Integer indicating the length of the rollouts, 
+            in order to set the size of the buffer arrays.
+        """
+        self.rollout_length = rollout_length
+
+        self.obs_buffer = np.ndarray((rollout_length, ))
+        self.log_prob_buffer = np.ndarray((rollout_length, ))
+        self.action_buffer = np.ndarray((rollout_length, ))
+        self.reward_buffer = np.ndarray((rollout_length, ))
+        self.adv_buffer = np.ndarray((rollout_length, ))
+        self.value_buffer = np.ndarray((rollout_length, ))
+
+    def __getitem__(self, key: [int, ] | int) -> "RolloutBuffer":
+        """
+        Retrieves a portion of the rollout buffer based on an index or
+        list of indexes.
+        Parameters
+        ---------
+        key: [int, ] or int
+            The indexes of the buffer to retrieve.
+        Returns
+        -------
+        RolloutBuffer
+            The shortened rollout buffer.
+        """
+        if isinstance(key, int):
+            rb = RolloutBuffer(1)
+            rb.obs_buffer[0] = self.obs_buffer[key]
+            rb.log_prob_buffer[0] = self.log_prob_buffer[key]
+            rb.action_buffer[0] = self.action_buffer[key]
+            rb.reward_buffer[0] = self.reward_buffer[key]
+            rb.adv_buffer[0] = self.adv_buffer[key]
+            rb.value_buffer[0] = self.value_buffer[key]
+
+        else:
+            rb = RolloutBuffer(len(key))
+            rb.obs_buffer = self.obs_buffer[key] 
+            rb.log_prob_buffer = self.log_prob_buffer[key]
+            rb.action_buffer = self.action_buffer[key]
+            rb.reward_buffer = self.reward_buffer[key]
+            rb.adv_buffer = self.adv_buffer[key]
+            rb.value_buffer = self.value_buffer[key]
+
+        return rb
     
-## TO DO: make it so that we don't have to do multiple dictionaries and then translate, 
-## just make a RolloutBuffer for each agent or vf so that we can pass it into the update function
+    def get_data(self, batch_size: int):
+        """
+        Randomly splits up data from a rollout 
+        
+        Yields
+        ------
+        RolloutBuffer
+            Abbreviated RolloutBuffer object for each minibatch.
+        """
+        perm = np.random.permutation(self.rollout_length) 
+
+        idx = 0
+        while idx < self.rollout_length: # will multiply by n_envs once multithreading is added
+            yield self[perm[idx:idx + batch_size]]
+            idx += batch_size
+
+
 class RolloutManager:
     """
     Implementation of monte carlo rollouts for the Generalized Advantage Estimation method. For 
@@ -100,7 +158,7 @@ class RolloutManager:
                 for t in range(1, len(states)):
                     obs = torch.flatten(torch.tensor([states[i][-t] for i in range(len(self.value_groups)) if self.value_groups[i] == agent]))
                     value1 = values[agent][-t+1] if t != 1 else 0 # V(s_{t+1}) 
-                    value2 = self.values[agent].forward(obs) # V(s_t)
+                    value2 = self.values[agent].forward(obs).item() # V(s_t)
                     adv[agent].append(adv[agent][-t] + coef * (rewards[-t] + self.gamma * value1 - value2))
                     values[agent].append(value1)
                     coef /= (self.gamma * self.lambda_)
@@ -109,7 +167,7 @@ class RolloutManager:
                 coef = (self.gamma * self.lambda_)**(len(states) - 1)
                 for t in range(1, len(states)): # goes in reverse by utilizing negative indexing
                     value1 = values[agent][-t+1] if t != 1 else 0 # V(s_{t+1}) 
-                    value2 = self.values[agent].forward(states[agent][-t]) # V(s_t)
+                    value2 = self.values[agent].forward(states[agent][-t]).item() # V(s_t)
                     adv[agent].append(adv[agent][-t] + coef * (rewards[-t] + self.gamma * value1 - value2))
                     values[agent].append(value1)
                     coef /= (self.gamma * self.lambda_)
@@ -123,7 +181,7 @@ class RolloutManager:
         Returns
         -------
 
-        Dict(int: [int, ])
+        Dict(int: RolloutBuffer)
             Dictionary such that each key corresponds to an agent, and the key refers to a rollout buffer.
         """
         buffers = [RolloutBuffer(defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)) \
@@ -155,18 +213,16 @@ class RolloutManager:
                     break
 
             episode_advs, episodes_values = self.calculate_adv(states, rewards)
-            for i in range(len(self.policy_groups)):
-                buffers[i].adv_buffer.append(episode_advs[self.value_groups[i]])
-                buffers[i].value_buffer.append(episodes_values[self.value_groups[i]])
-                buffers[i].obs_buffer.append(states[i])
-                buffers[i].log_prob_buffer.append(log_probs[i])
-                buffers[i].action_buffer.append(actions[i])
-                buffers[i].reward_buffer.append(rewards[i])
+            for j in range(len(self.policy_groups)):
+                buffers[j].adv_buffer[i] = np.array(episode_advs[self.value_groups[j]])
+                buffers[j].value_buffer[i] = np.array(episodes_values[self.value_groups[j]])
+                buffers[j].obs_buffer[i] = np.array(states[j])
+                buffers[j].log_prob_buffer[i] = np.array(log_probs[j])
+                buffers[j].action_buffer[i] = np.array(actions[j])
+                buffers[j].reward_buffer[i] = np.array(rewards[j])
 
         return buffers
 
-    def get_data(self, batch_size: int):
-        pass
         
         
 

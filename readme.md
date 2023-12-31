@@ -5,6 +5,7 @@
 ## PPO (agt.cooperative.ppo)
 1. Finish single agent PPO first 
 2. Add child classes to PPO (MAPPO, IPPO)
+3. Add optional orthogonal initialization for weights
 ## Trainer Classes
 1. Add classes that will train two teams against each other, including running the rollout manager and then passing the buffers
 2. Team-PSRO, FXP, Self-PLay
