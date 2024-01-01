@@ -1,4 +1,4 @@
-from typing import Iterable, List, Dict, DefaultDict
+from typing import Iterable, List, Dict, DefaultDict, Union
 from collections import defaultdict
 
 import torch
@@ -21,15 +21,15 @@ class RolloutBuffer:
             in order to set the size of the buffer arrays.
         """
         self.rollout_length = rollout_length
-
-        self.obs_buffer = np.ndarray((rollout_length, ))
+        self.obs_buffer = torch.zeros((rollout_length, ))
         self.log_prob_buffer = np.ndarray((rollout_length, ))
         self.action_buffer = np.ndarray((rollout_length, ))
         self.reward_buffer = np.ndarray((rollout_length, ))
         self.adv_buffer = np.ndarray((rollout_length, ))
         self.value_buffer = np.ndarray((rollout_length, ))
+        self.return_buffer = np.ndarray((rollout_length, ))
 
-    def __getitem__(self, key: [int, ] | int) -> "RolloutBuffer":
+    def __getitem__(self, key: Union[List[int, ], int]) -> "RolloutBuffer":
         """
         Retrieves a portion of the rollout buffer based on an index or
         list of indexes.
@@ -50,6 +50,7 @@ class RolloutBuffer:
             rb.reward_buffer[0] = self.reward_buffer[key]
             rb.adv_buffer[0] = self.adv_buffer[key]
             rb.value_buffer[0] = self.value_buffer[key]
+            rb.return_buffer[0] = self.return_buffer[key]
 
         else:
             rb = RolloutBuffer(len(key))
@@ -59,18 +60,20 @@ class RolloutBuffer:
             rb.reward_buffer = self.reward_buffer[key]
             rb.adv_buffer = self.adv_buffer[key]
             rb.value_buffer = self.value_buffer[key]
+            rb.return_buffer = self.return_buffer[key]
 
         return rb
     
     def get_data(self, batch_size: int):
         """
-        Randomly splits up data from a rollout 
+        Randomly splits up data from a rollout.
         
         Yields
         ------
         RolloutBuffer
             Abbreviated RolloutBuffer object for each minibatch.
         """
+
         perm = np.random.permutation(self.rollout_length) 
 
         idx = 0
@@ -86,7 +89,7 @@ class RolloutManager:
     inspired by the OpenAI stable baselines: https://github.com/DLR-RM/stable-baselines3. Also
     used the https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/ blog post as a reference.
     """
-    def __init__(self, rollout_length: int, env: gym.Env, policies: Iterable[PolicyNetwork, ], values: Iterable[ValueNetwork | LinearValue, ], policy_groups: Iterable[PolicyNetwork, ] = None, value_groups: Iterable[PolicyNetwork, ] = None, gamma: float = 0.99, lambda_: float = 0.95) -> None:
+    def __init__(self, rollout_length: int, env: gym.Env, policies: Iterable[PolicyNetwork, ], values: Iterable[ Union[ValueNetwork, LinearValue], ], policy_groups: Iterable[PolicyNetwork, ] = None, value_groups: Iterable[PolicyNetwork, ] = None, gamma: float = 0.99, gae_lambda: float = 0.95) -> None:
         """
         rollout_length: int
             Amount of episodes to simulate per rollout. 
@@ -100,15 +103,17 @@ class RolloutManager:
         policy_groups: Iterable(int), optional
             An iterable such that the ith element represents the policy
             of the ith agent. Used to specify which agents share which
-            policy. Defaults to `None`.
+            policy. Defaults to `None`. Assumes that if none is specified,
+            there is no shared policy.
         value_groups: Iterable(int), optional
             An iterable such that the ith element represents the value
             estimator of the ith agent. Used to specify which agents share which
-            value estimator. Defaults to `None`.
+            value estimator. Defaults to `None`. Assumes that if none is specified,
+            there is no shared value function.
         gamma: float, optional, keyword only
             The hyperparameter for discounting return. Must be in the range `[0,1]`. Defaults to
             `0.99`.
-        lambda_: float, optional, keyword only
+        gae_lambda: float, optional, keyword only
             The hyperparameter for Generalized Advantage Estimation. Must be in the range `[0,1]`.
             Defaults to `0.95`.
         """
@@ -117,13 +122,13 @@ class RolloutManager:
 
         self.policies = policies
         if policy_groups is None:
-            self.policy_groups = list(range(len(self.policy_groups)))
+            self.policy_groups = list(range(len(policies)))
         else:
             self.policy_groups = policy_groups
 
         self.values = values
         if value_groups is None:
-            self.value_groups = list(range(len(self.value_groups)))
+            self.value_groups = list(range(len(values)))
         else:
             self.value_groups = value_groups
         
@@ -148,31 +153,48 @@ class RolloutManager:
         DefaultDict(int: [int, ])
             Dictionary of lists such that each key refers to each agent and the corresponding 
             lists hold the agents' respective state-values at each time step.
+        DefaultDict(int: [int, ])
+            Dictionary of lists such that each key refers to each agent and the corresponding
+            lists hold the agents' respective discounted returns at each time step.
         """
         adv = defaultdict(list)
         values = defaultdict(list)
+        returns = defaultdict(list)
 
         if len(self.values) == len(self.value_groups):
             for agent in range(len(self.values)):
-                coef = (self.gamma * self.lambda_)**(len(states) - 1)
+                gamma = self.gamma ** (len(states) - 1)
+                gae_lambda = self.gae_lambda ** (len(states) - 1)
                 for t in range(1, len(states)):
+                    coef = gamma * gae_lambda
                     obs = torch.flatten(torch.tensor([states[i][-t] for i in range(len(self.value_groups)) if self.value_groups[i] == agent]))
                     value1 = values[agent][-t+1] if t != 1 else 0 # V(s_{t+1}) 
                     value2 = self.values[agent].forward(obs).item() # V(s_t)
-                    adv[agent].append(adv[agent][-t] + coef * (rewards[-t] + self.gamma * value1 - value2))
-                    values[agent].append(value1)
-                    coef /= (self.gamma * self.lambda_)
+                    prev_adv = adv[agent][-t+1] if t != 1 else 0 
+                    prev_return = returns[agent][-t+1] if t != 1 else 0
+
+                    adv[agent].append(prev_adv + coef * (rewards[-t] + self.gamma * value1 - value2))
+                    values[agent].append(value2)
+                    returns[agent].append(prev_return + gamma * rewards[-t])
+                    gamma /= self.gamma
+                    gae_lambda /= self.gae_lambda
         else:
             for agent in range(len(self.values)): 
-                coef = (self.gamma * self.lambda_)**(len(states) - 1)
+                gamma = self.gamma ** (len(states) - 1)
+                gae_lambda = self.gae_lambda ** (len(states) - 1)
                 for t in range(1, len(states)): # goes in reverse by utilizing negative indexing
+                    coef = gamma * gae_lambda
                     value1 = values[agent][-t+1] if t != 1 else 0 # V(s_{t+1}) 
                     value2 = self.values[agent].forward(states[agent][-t]).item() # V(s_t)
-                    adv[agent].append(adv[agent][-t] + coef * (rewards[-t] + self.gamma * value1 - value2))
-                    values[agent].append(value1)
-                    coef /= (self.gamma * self.lambda_)
+                    prev_adv = adv[agent][-t+1] if t != 1 else 0 
+                    
+                    adv[agent].append(prev_adv + coef * (rewards[-t] + self.gamma * value1 - value2))
+                    values[agent].append(value2)
+                    returns[agent].append(gamma * rewards[-t] + returns[agent[-t]])
+                    gamma /= self.gamma
+                    gae_lambda /= self.gae_lambda
 
-        return {i: adv[i][::-1] for i in range(len(adv))}, {i: adv[i][::-1] for i in range(len(values))}
+        return {i: adv[i][::-1] for i in range(len(adv))}, {i: values[i][::-1] for i in range(len(values))}, {i: returns[i][::-1] for i in range(len(returns))}
 
     def rollout(self) -> Dict[int, List[int, ]]:
         """
@@ -184,26 +206,34 @@ class RolloutManager:
         Dict(int: RolloutBuffer)
             Dictionary such that each key corresponds to an agent, and the key refers to a rollout buffer.
         """
-        buffers = [RolloutBuffer(defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)) \
-                   for _ in range(len(self.policy_groups))]
+        buffers = [RolloutBuffer(self.rollout_length) for _ in range(len(self.policy_groups))]
         
         for i in range(self.rollout_length):
-            obs, _ = self.env.reset()
-
             states = defaultdict(list)
             log_probs = defaultdict(list)
             actions = defaultdict(list)
             rewards = defaultdict(list)
 
+            obs, _ = self.env.reset()
+
+            ## TODO: make this more eloquent
+            if isinstance(obs, dict):
+                states = obs
+            else:
+                states = {
+                    0: [obs]
+                }
+
             while True: # completes one episode in the environment
 
                 action = {}
                 for i in range(len(self.policy_groups)): # sampling actions and log probs
-                    action, log_prob = self.policies[self.policy_groups[i]].get_action()
+                    action, log_prob = self.policies[self.policy_groups[i]].get_action(obs)
                     action[i] = action
                     log_probs[i].append(log_prob)
 
                 obs, reward, done, trunc, _ = self.env.step(action)
+                obs = torch.tensor(obs)
 
                 for i in range(len(self.policy_groups)):
                     states[i].append(obs[i])
@@ -212,7 +242,7 @@ class RolloutManager:
                 if done or trunc:
                     break
 
-            episode_advs, episodes_values = self.calculate_adv(states, rewards)
+            episode_advs, episodes_values, episode_returns = self.calculate_adv(states, rewards)
             for j in range(len(self.policy_groups)):
                 buffers[j].adv_buffer[i] = np.array(episode_advs[self.value_groups[j]])
                 buffers[j].value_buffer[i] = np.array(episodes_values[self.value_groups[j]])
@@ -220,6 +250,7 @@ class RolloutManager:
                 buffers[j].log_prob_buffer[i] = np.array(log_probs[j])
                 buffers[j].action_buffer[i] = np.array(actions[j])
                 buffers[j].reward_buffer[i] = np.array(rewards[j])
+                buffers[j].return_buffer[i] = np.array(episode_returns[j])
 
         return buffers
 

@@ -31,7 +31,7 @@ class PolicyNetwork(nn.Module):
             An iterable such that the ith element represents the width of the ith hidden layer. 
             Defaults to `[64,128]`. Note that this does not include the input or output layers.
         """
-        super().__init__(self)
+        super(PolicyNetwork, self).__init__()
         prev_dim = obs_size 
         hl_dims.append(action_size)
         self.layers = nn.ModuleList()
@@ -74,7 +74,7 @@ class PolicyNetwork(nn.Module):
         if len(x.shape) != 1:
             raise ValueError("Parameter 'x' is not a flattened tensor")
 
-        dist = torch.distributions.Categorical(self.policy.forward(x))
+        dist = torch.distributions.Categorical(self.forward(x))
         action = dist.sample()
         log_prob = dist.log_prob(action)
         
@@ -97,7 +97,7 @@ class ValueNetwork(nn.Module):
             An iterable such that the ith element represents the width of the ith hidden layer. 
             Defaults to `[64,128]`. Note that this does not include the input or output layers.
         """
-        super().__init__(self)
+        super(ValueNetwork, self).__init__()
         prev_dim = obs_size 
         hl_dims.append(1)
 
@@ -139,7 +139,7 @@ class LinearValue(nn.Module):
         num_features: int
             The number of features that the linear regression will process. 
         """
-        super().__init__(self)
+        super(LinearValue, self).__init__()
         self.feature_mapping = nn.Linear(obs_size, num_features)
         self.line = nn.Linear(num_features, 1)
 
@@ -176,7 +176,7 @@ class QNetwork(nn.Module):
             An iterable such that the ith element represents the width of the ith hidden layer. 
             Defaults to `[64,128]`. Note that this does not include the input or output layers.
         """
-        super().__init__(self)
+        super(QNetwork, self).__init__()
         prev_dim = obs_size + 1 # + 1 for the action's value
         hl_dims.append(1)
 
@@ -216,7 +216,7 @@ class LinearQ(nn.Module):
         num_features: int
             The number of features that the linear regression will process. 
         """
-        super().__init__(self)
+        super(LinearQ, self).__init__()
         self.feature_mapping = nn.Linear(obs_size, num_features)
         self.line = nn.Linear(num_features, 1)
 
@@ -278,6 +278,7 @@ class RLBase(ABC):
         self.obs_size = obs_size
 
         if v_obs_size is None:
+        
             self.v_obs_size = obs_size
         else:
             self.v_obs_size = v_obs_size
@@ -305,15 +306,15 @@ class RLBase(ABC):
             self.gamma = gamma
 
         if self.value_type == 'V' and self.linear_value:
-            self.value = LinearValue(v_obs_size, value_hl_dims)
+            self.value = LinearValue(self.v_obs_size, self.value_hl_dims)
         elif self.value_type == 'V':
-            self.value = ValueNetwork(v_obs_size, value_hl_dims)
+            self.value = ValueNetwork(self.v_obs_size, self.value_hl_dims)
         elif self.value_type == 'Q' and self.linear_value:
-            self.value = LinearQ(v_obs_size, value_hl_dims)
+            self.value = LinearQ(self.v_obs_size, self.value_hl_dims)
         else:
-            self.value = QNetwork(v_obs_size, value_hl_dims)
+            self.value = QNetwork(self.v_obs_size, self.value_hl_dims)
 
-        self.policy = PolicyNetwork(obs_size, action_size, policy_hl_dims)
+        self.policy = PolicyNetwork(self.obs_size, self.action_size, self.policy_hl_dims)
         
     @abstractmethod
     def train(self, utility) -> None:

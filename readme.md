@@ -3,6 +3,7 @@
 1. Transition From Dictionaries to a buffer for each agent
     - this requires us to duplicate the advantage list for each agent
 ## PPO (agt.cooperative.ppo)
+0. Add optimizer so it works
 1. Finish single agent PPO first 
 2. Add child classes to PPO (MAPPO, IPPO)
 3. Add optional orthogonal initialization for weights

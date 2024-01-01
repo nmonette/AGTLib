@@ -15,4 +15,4 @@ class StrategyNotInSimplexException(ValueError):
     it has negative values and/or does not sum to 1.
     """
     def __init__(self, var_name):
-        super().__init__(self, f"The parameter '{var_name}' is not in the simplex. Please input a vector that is nonnegative and sums to one")
+        super().__init__(f"The parameter '{var_name}' is not in the simplex. Please input a vector that is nonnegative and sums to one")

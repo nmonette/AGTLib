@@ -1,3 +1,5 @@
+from typing import Union
+
 import numpy as np
 import torch 
 from torch.nn import Softmax
@@ -41,7 +43,7 @@ class VanillaGradientDescent:
         else:
             self.stepsize = stepsize
 
-    def step(self, utility: int | float) -> bool:
+    def step(self, utility: Union[int, float]) -> bool:
         """
         Updates `self.current` with the next gradient step. 
 
