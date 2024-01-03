@@ -26,7 +26,7 @@ class PPO(RLBase):
         if not (0 <= gae_lambda <= 1):
             raise ValueError("Parameter 'gae_lambda' is not in the range `[0,1]`")
         else:
-            self.gae_gae_lambda = gae_lambda
+            self.gae_lambda = gae_lambda
         
         if not (0 <= clip_range < 1):
             raise ValueError("Parameter 'clip_range' is not in the range `[0,1)`")
@@ -43,12 +43,17 @@ class PPO(RLBase):
         else:
             self.vf_coef = vf_coef
 
+        self.normalize_advantage = True # TODO write if else
+        self.ent_coef = ent_coef
+        self.target_kl = target_kl
+        self.verbose = verbose
+
         # self.actor_extractor = PolicyNetwork(obs_size, action_latent_dim)
         # self.critic_extractor = ValueNetwork(obs_size)
 
         # self.latent_net = nn.Linear(action_size)
 
-    def preprocess(self, obs: np.ndarray):
+    def preprocess(self, obs: torch.Tensor):
         '''
         Preprocesses observations.
         Parameters
@@ -63,18 +68,19 @@ class PPO(RLBase):
         torch.Tensor
             Tensor that contains the output of critic_extractor
         '''
-        obs = torch.Flatten()(obs).float()
+        return nn.Flatten()(obs).float()
+        
 
-    def _evaluate_actions(self, actions: np.ndarray, obs: np.ndarray):
+    def _evaluate_actions(self, obs: torch.Tensor, actions: np.ndarray):
         """
         Evaluates analysis of the rollout data that is necessary for 
         calculation of the PPO loss. 
         Parameters
         ----------
-        actions: np.ndarray
-            Array containing the integer index of each action at each time step.
         obs: np.ndarray
             Array containing the flattened observation at each time step.
+        actions: np.ndarray
+            Array containing the integer index of each action at each time step.
 
         Returns
         -------
@@ -121,7 +127,7 @@ class PPO(RLBase):
         for epoch in range(num_epochs):
             approx_kl_divs = []
             for data in buffer.get_data(batch_size):
-                actions = data.actions_buffer
+                actions = data.action_buffer
 
                 values, log_prob, entropy = self._evaluate_actions(data.obs_buffer, actions)
                 values = values.flatten()

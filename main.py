@@ -6,6 +6,7 @@ import torch
 
 from agtlib.cooperative.ppo import PPO
 from agtlib.utils.rollout import RolloutManager
+from agtlib.utils.env import SingleAgentEnvWrapper
 
 if __name__ == "__main__":
     # game = np.stack([
@@ -32,15 +33,14 @@ if __name__ == "__main__":
     #     print("2: ", mw2.get_strategy())
 
     env = gym.make("CartPole-v1")
+    env = SingleAgentEnvWrapper(env)
     ppo = PPO(2, 4)
 
-    for episode in range(100):
-        while True:
+    for epoch in range(10):
+        rollout = RolloutManager(10, env, [ppo.policy], [ppo.value])
+        buffer = rollout.rollout()[0]
 
-            rollout = RolloutManager(10, env, [ppo.policy], [ppo.value])
-            buffer = rollout.rollout()[0]
-
-            ppo.train(buffer)
+        ppo.train(buffer)
 
         
 

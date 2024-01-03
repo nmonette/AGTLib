@@ -21,13 +21,13 @@ class RolloutBuffer:
             in order to set the size of the buffer arrays.
         """
         self.rollout_length = rollout_length
-        self.obs_buffer = torch.zeros((rollout_length, ))
-        self.log_prob_buffer = np.ndarray((rollout_length, ))
-        self.action_buffer = np.ndarray((rollout_length, ))
-        self.reward_buffer = np.ndarray((rollout_length, ))
-        self.adv_buffer = np.ndarray((rollout_length, ))
-        self.value_buffer = np.ndarray((rollout_length, ))
-        self.return_buffer = np.ndarray((rollout_length, ))
+        self.obs_buffer = [] 
+        self.log_prob_buffer = []
+        self.action_buffer = []
+        self.reward_buffer = []
+        self.adv_buffer = []
+        self.value_buffer = []
+        self.return_buffer = []
 
     def __getitem__(self, key: Union[List[int, ], int]) -> "RolloutBuffer":
         """
@@ -73,6 +73,14 @@ class RolloutBuffer:
         RolloutBuffer
             Abbreviated RolloutBuffer object for each minibatch.
         """
+        
+        self.obs_buffer = torch.stack(self.obs_buffer) 
+        self.log_prob_buffer = torch.tensor(self.log_prob_buffer) 
+        self.action_buffer = torch.tensor(self.action_buffer) 
+        self.reward_buffer = torch.tensor(self.reward_buffer) 
+        self.adv_buffer = torch.tensor(self.adv_buffer[::-1]) 
+        self.value_buffer = torch.tensor(self.value_buffer[::-1]) 
+        self.return_buffer = torch.tensor(self.return_buffer[::-1]) 
 
         perm = np.random.permutation(self.rollout_length) 
 
@@ -131,70 +139,46 @@ class RolloutManager:
             self.value_groups = list(range(len(values)))
         else:
             self.value_groups = value_groups
-        
 
-    def calculate_adv(self, states: DefaultDict[int, List[int, ]], rewards: DefaultDict[int, List[int, ]]) -> (Dict[int, List[int, ]], Dict[int, List[int, ]]):
+        self.gamma = gamma
+        self.gae_lambda = gae_lambda        
+
+    def calculate_adv(self, buffers: [RolloutBuffer, ], timesteps: int):
         """
-        Calculates the advantages given the states, actions, and rewards of a given episode.
+        Calculates the advantages given the states, actions, and rewards of a given episode, 
+        and populates the give RolloutBuffer objects with them.
         Parameters
         ----------
-        states: DefaultDict(int: [int, ])
-            Dictionary of lists such that each key refers to each agent and the correpsponding 
-            lists hold the agents' respective observations at each time step. 
-        rewards: DefaultDict(int: [int, ])
-            Dictionary of lists such that each key refers to each agent and the correpsponding 
-            lists hold the agents' respective rewards at each time step. 
-        
-        Returns
-        -------
-        DefaultDict(int: [int, ])
-            Dictionary of lists such that each key refers to each agent and the corresponding 
-            lists hold the agents' respective advantage values at each time step.
-        DefaultDict(int: [int, ])
-            Dictionary of lists such that each key refers to each agent and the corresponding 
-            lists hold the agents' respective state-values at each time step.
-        DefaultDict(int: [int, ])
-            Dictionary of lists such that each key refers to each agent and the corresponding
-            lists hold the agents' respective discounted returns at each time step.
+        buffers: List(RolloutBuffer, )
+            List of RolloutBuffer objects holding data collected from the episode.
+        timesteps: int
+            Integer representing the number of timesteps that data was collected in the last 
+            rollout iteration.
         """
-        adv = defaultdict(list)
-        values = defaultdict(list)
-        returns = defaultdict(list)
-
-        if len(self.values) == len(self.value_groups):
+        coef = self.gamma * self.gae_lambda
+        if len(self.values) != len(self.value_groups):
             for agent in range(len(self.values)):
-                gamma = self.gamma ** (len(states) - 1)
-                gae_lambda = self.gae_lambda ** (len(states) - 1)
-                for t in range(1, len(states)):
-                    coef = gamma * gae_lambda
-                    obs = torch.flatten(torch.tensor([states[i][-t] for i in range(len(self.value_groups)) if self.value_groups[i] == agent]))
-                    value1 = values[agent][-t+1] if t != 1 else 0 # V(s_{t+1}) 
+                for t in range(1, timesteps):
+                    obs = torch.flatten(torch.tensor([buffers[i].obs_buffer[-t] for i in range(len(self.value_groups)) if self.value_groups[i] == agent]))
+                    value1 = buffers[agent].value_buffer[t-2] if t != 1 else 0 # V(s_{t+1}) 
                     value2 = self.values[agent].forward(obs).item() # V(s_t)
-                    prev_adv = adv[agent][-t+1] if t != 1 else 0 
-                    prev_return = returns[agent][-t+1] if t != 1 else 0
+                    prev_adv = buffers[agent].adv_buffer[t-2] if t != 1 else 0 
+                    prev_return = buffers[agent].return_buffer[t-2] if t != 1 else 0
 
-                    adv[agent].append(prev_adv + coef * (rewards[-t] + self.gamma * value1 - value2))
-                    values[agent].append(value2)
-                    returns[agent].append(prev_return + gamma * rewards[-t])
-                    gamma /= self.gamma
-                    gae_lambda /= self.gae_lambda
+                    buffers[agent].adv_buffer.append(coef * prev_adv + (buffers[agent].reward_buffer[-t] + self.gamma * value1 - value2))
+                    buffers[agent].value_buffer.append(value2)
+                    buffers[agent].return_buffer.append(self.gamma * prev_return + buffers[agent].reward_buffer[-t])
         else:
             for agent in range(len(self.values)): 
-                gamma = self.gamma ** (len(states) - 1)
-                gae_lambda = self.gae_lambda ** (len(states) - 1)
-                for t in range(1, len(states)): # goes in reverse by utilizing negative indexing
-                    coef = gamma * gae_lambda
-                    value1 = values[agent][-t+1] if t != 1 else 0 # V(s_{t+1}) 
-                    value2 = self.values[agent].forward(states[agent][-t]).item() # V(s_t)
-                    prev_adv = adv[agent][-t+1] if t != 1 else 0 
+                for t in range(1, timesteps): # goes in reverse by utilizing negative indexing
+                    value1 = buffers[agent].value_buffer[t-2] if t != 1 else 0 # V(s_{t+1}) 
+                    value2 = self.values[agent].forward(buffers[agent].obs_buffer[-t]).item() # V(s_t)
+                    prev_adv = buffers[agent].adv_buffer[t-2] if t != 1 else 0 
+                    prev_return = buffers[agent].return_buffer[t-2] if t != 1 else 0
                     
-                    adv[agent].append(prev_adv + coef * (rewards[-t] + self.gamma * value1 - value2))
-                    values[agent].append(value2)
-                    returns[agent].append(gamma * rewards[-t] + returns[agent[-t]])
-                    gamma /= self.gamma
-                    gae_lambda /= self.gae_lambda
-
-        return {i: adv[i][::-1] for i in range(len(adv))}, {i: values[i][::-1] for i in range(len(values))}, {i: returns[i][::-1] for i in range(len(returns))}
+                    buffers[agent].adv_buffer.append(coef * prev_adv + (buffers[agent].reward_buffer[-t] + self.gamma * value1 - value2))
+                    buffers[agent].value_buffer.append(value2)
+                    buffers[agent].return_buffer.append(self.gamma * prev_return + buffers[agent].reward_buffer[-t])
 
     def rollout(self) -> Dict[int, List[int, ]]:
         """
@@ -208,49 +192,36 @@ class RolloutManager:
         """
         buffers = [RolloutBuffer(self.rollout_length) for _ in range(len(self.policy_groups))]
         
-        for i in range(self.rollout_length):
-            states = defaultdict(list)
-            log_probs = defaultdict(list)
-            actions = defaultdict(list)
-            rewards = defaultdict(list)
-
+        for i in range(self.rollout_length): # we should turn the block of this code into a function so that we can parallelize it
             obs, _ = self.env.reset()
+            
+            for i in range(len(self.policy_groups)):
+                obs[i] = torch.from_numpy(obs[i])
+                buffers[i].obs_buffer.append(obs[i])
 
-            ## TODO: make this more eloquent
-            if isinstance(obs, dict):
-                states = obs
-            else:
-                states = {
-                    0: [obs]
-                }
-
+            timesteps = 0 
             while True: # completes one episode in the environment
 
-                action = {}
-                for i in range(len(self.policy_groups)): # sampling actions and log probs
-                    action, log_prob = self.policies[self.policy_groups[i]].get_action(obs)
-                    action[i] = action
-                    log_probs[i].append(log_prob)
+                currrent_action = {}
+                for j in range(len(self.policy_groups)): # sampling actions and log probs
+                    action, log_prob = self.policies[self.policy_groups[j]].get_action(obs[j])
+                    currrent_action[j] = action.item()
+                    buffers[i].action_buffer.append(currrent_action[j])
+                    buffers[i].log_prob_buffer.append(log_prob)
 
-                obs, reward, done, trunc, _ = self.env.step(action)
-                obs = torch.tensor(obs)
+                obs, reward, done, trunc, _ = self.env.step(currrent_action)
+                obs = {i: torch.from_numpy(obs[i]) for i in range(len(obs))}
 
-                for i in range(len(self.policy_groups)):
-                    states[i].append(obs[i])
-                    rewards[i].append(reward[i])
+                for j in range(len(buffers)):
+                    buffers[j].obs_buffer.append(obs[j])
+                    buffers[j].reward_buffer.append(reward[j])
 
-                if done or trunc:
+                if done or trunc: # we may need to put in some kind of modification here for if the episode is truncated
                     break
+                
+                timesteps += 1
 
-            episode_advs, episodes_values, episode_returns = self.calculate_adv(states, rewards)
-            for j in range(len(self.policy_groups)):
-                buffers[j].adv_buffer[i] = np.array(episode_advs[self.value_groups[j]])
-                buffers[j].value_buffer[i] = np.array(episodes_values[self.value_groups[j]])
-                buffers[j].obs_buffer[i] = np.array(states[j])
-                buffers[j].log_prob_buffer[i] = np.array(log_probs[j])
-                buffers[j].action_buffer[i] = np.array(actions[j])
-                buffers[j].reward_buffer[i] = np.array(rewards[j])
-                buffers[j].return_buffer[i] = np.array(episode_returns[j])
+            self.calculate_adv(buffers, timesteps)
 
         return buffers
 

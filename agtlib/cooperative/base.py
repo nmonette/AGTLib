@@ -53,7 +53,7 @@ class PolicyNetwork(nn.Module):
             Probability vector containing the action-probabilities.
         """
         for i in range(len(self.layers) - 1):
-            x = torch.nn.ReLU(self.layers[i](x))
+            x = torch.nn.ReLU()(self.layers[i](x))
         return self.layers[-1](x)
 
     @torch.no_grad()
@@ -71,10 +71,8 @@ class PolicyNetwork(nn.Module):
         float
             The log probability of the returned action with reference to the current policy.
         """
-        if len(x.shape) != 1:
-            raise ValueError("Parameter 'x' is not a flattened tensor")
 
-        dist = torch.distributions.Categorical(self.forward(x))
+        dist = torch.distributions.Categorical(logits=self.forward(x))
         action = dist.sample()
         log_prob = dist.log_prob(action)
         
@@ -119,10 +117,9 @@ class ValueNetwork(nn.Module):
         torch.Tensor
             Probability vector containing the action-probabilities.
         """
-        if len(x.shape) != 1:
-            raise ValueError("Parameter 'x' is not a flattened tensor")
+
         for i in range(len(self.layers) - 1):
-            x = torch.nn.ReLU(self.layers[i](x))
+            x = torch.nn.ReLU()(self.layers[i](x))
         return self.layers[-1](x)
 
 class LinearValue(nn.Module):
@@ -199,7 +196,7 @@ class QNetwork(nn.Module):
             Probability vector containing the action-probabilities.
         """
         for i in range(len(self.layers) - 1):
-            x = torch.nn.ReLU(self.layers[i](x))
+            x = torch.nn.ReLU()(self.layers[i](x))
         return self.layers[-1](x)
 
 class LinearQ(nn.Module):
