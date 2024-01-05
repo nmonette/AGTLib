@@ -32,23 +32,14 @@ if __name__ == "__main__":
     #     print("1: ", mw1.get_strategy())
     #     print("2: ", mw2.get_strategy())
 
-    env = gym.make("CartPole-v1")
+    env = gym.make("CartPole-v1", render_mode="human")
     env = SingleAgentEnvWrapper(env)
     ppo = PPO(2, 4)
 
-    for epoch in range(10):
-        rollout = RolloutManager(10, env, [ppo.policy], [ppo.value])
+    for epoch in range(100):
+        rollout = RolloutManager(30, env, [ppo.policy], [ppo.value])
         buffer = rollout.rollout()[0]
 
         ppo.train(buffer)
-
-        
-
-
-
-
-
-
-    
         
 # pdoc --docformat numpy agtlib

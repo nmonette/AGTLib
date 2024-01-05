@@ -194,6 +194,7 @@ class RolloutManager:
         
         for i in range(self.rollout_length): # we should turn the block of this code into a function so that we can parallelize it
             obs, _ = self.env.reset()
+            self.env.render()
             
             for i in range(len(self.policy_groups)):
                 obs[i] = torch.from_numpy(obs[i])

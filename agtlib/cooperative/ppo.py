@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import gymnasium as gym
 
-from .base import RLBase, PolicyNetwork, ValueNetwork
+from .base import RLBase, PolicyNetwork, ValueNetwork, ActorCritic
 from ..utils.rollout import RolloutBuffer, RolloutManager
 
 class PPO(RLBase):
@@ -18,11 +18,67 @@ class PPO(RLBase):
     """
     def __init__(self, action_size: int, obs_size: int, *, v_obs_size: int = None, policy_hl_dims: Iterable[int, ] = [64,128], \
                  value_hl_dims: Iterable[int, ] = [64, 128], linear_value: bool = False, gamma: float = 0.99, \
-                    gae_lambda: float = 0.95, clip_range: float = 0.2, clip_range_vf: float = 0.2, action_latent_dim: int = 100,
+                    gae_lambda: float = 0.95, clip_range: float = 0.2, clip_range_vf: float = 0.2,
                     vf_coef: float = 0.5, ent_coef: float = 0.0, target_kl: float = None, normalize_advantage: bool = True, 
-                    verbose: int = 0): # write docstrings for parameters
+                    verbose: int = 0, max_grad_norm: float = 0.5): # write docstrings for parameters
         super().__init__(action_size, obs_size, v_obs_size=v_obs_size, policy_hl_dims=policy_hl_dims, value_hl_dims=value_hl_dims, 
                          linear_value=linear_value, gamma=gamma)
+        '''
+        Initialize PPO parameters.
+        Parameters
+        -------
+        action_size: int
+            The cardinality of the action space of a single agent.
+        obs_size: int
+            The length of the flattened observation of the agent(s). 
+        v_obs_size: int, optional, keyword only
+            The length of the flattened observation size of the agent(s).
+            Only specify if different from policy `obs_size` (e.g. the 
+            policy network uses locallized observations, but the value 
+            network uses the joint observation of multiple agents).
+        policy_hl_dims: Iterable(int), optional, keyword only
+            An iterable such that the ith element represents 
+            the width of the ith hidden layer
+            of the policy network. Defaults to `[64,128]`.
+            Note that this does not include the 
+            input or output layers.
+        value_hl_dims: Iterable(int), optional, keyword only
+            An iterable such that the ith element represents the 
+            width of the ith hidden layer of the value network. 
+            Defaults to `[64,128]`. Note that this does not include 
+            the input or output layers. Must be length 1 if linear_value 
+            is enabled, with the value equal to the number 
+            of linear features.
+        linear_value: bool, optional, keyword only
+            Indicates whether or not the value function is to be 
+            approximated linearly. Defaults to `False`.
+        gamma: float, optional, keyword only
+            The dicount factor. Defaults to `0.99`.
+        gae_lambda: float, optional, keyword only
+            Factor for trade-off of bias vs variance for Generalized Advantage Estimator
+            Defaults to `0.95`.
+        clip_range: float, optional, keyword only
+            The clip range of the ratio for the policy Defaults to `0.2`,
+            meaning the value is restricted to 1.2 and 0.8.
+        clip_range_vf: float, optional, keyword only
+            The clip range for the value function. Defaults to `0.2`, 
+            meaning the value is restricted to 1.2 and 0.8.
+        vf_coef: float, optional, keyword only
+            Coefficient for the Value function in the calculation of loss.
+            Defaults to `0.5`.__async_iterable 
+        ent_coef: float, optional, keyword only
+            Coefficient for the entropy in the calculation of loss. 
+            Defaults to `0.0`.
+        target_kl: float, optional, keyword only
+            KL divergence between old and new policies
+            that stops training when reached.
+            Defaults to `None`. 
+        normalize_advantage: bool, optional, keyword only
+            Boolean for determining whether to normalize the advantage. 
+            Defaults to `True`.
+        max_grad_norm: float, optional, keyword
+            Maximum value for the clipping of the gradient. Defaults to `0.5`.
+        '''
         if not (0 <= gae_lambda <= 1):
             raise ValueError("Parameter 'gae_lambda' is not in the range `[0,1]`")
         else:
@@ -43,15 +99,30 @@ class PPO(RLBase):
         else:
             self.vf_coef = vf_coef
 
+        if not (0 <= ent_coef < 1):
+            raise ValueError("Parameter 'ent_coef' is not in the range `[0,1)`")
+        else:
+            self.ent_coef = ent_coef
+        
+        if not (0 <= ent_coef < 1):
+            raise ValueError("Parameter 'ent_coef' is not in the range `[0,1)`")
+        else:
+            self.ent_coef = ent_coef
+        
+
         self.normalize_advantage = True # TODO write if else
         self.ent_coef = ent_coef
         self.target_kl = target_kl
         self.verbose = verbose
+        self.max_grad_norm = max_grad_norm
 
-        # self.actor_extractor = PolicyNetwork(obs_size, action_latent_dim)
-        # self.critic_extractor = ValueNetwork(obs_size)
+        policy_params = nn.utils.parameters_to_vector(self.policy.parameters())
+        value_params = nn.utils.parameters_to_vector(self.value.parameters())
+        print(policy_params.is_leaf)
+        print(value_params.is_leaf)
 
-        # self.latent_net = nn.Linear(action_size)
+        self.actor_critic = ActorCritic(self.policy, self.value)
+        self.optimizer = torch.optim.Adam(self.actor_critic.parameters()) # can make it so that there are other compatible optimizers in the future
 
     def preprocess(self, obs: torch.Tensor):
         '''
@@ -185,16 +256,15 @@ class PPO(RLBase):
 
                 if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
                     continue_training = False
-                    if self.verbose >= 1:
-                        print(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
+                    print(f"Early Stopping because KL Divergence is {approx_kl_div}.")
                     break
 
                 # Optimization step
-                self.policy.optimizer.zero_grad()
+                self.optimizer.zero_grad() # self.policy.optimizer.zero_grad()
                 loss.backward()
                 # Clip grad norm
                 torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-                self.policy.optimizer.step()
+                self.optimizer.step() # self.policy.optimizer.step()
             
             if not continue_training:
                 break

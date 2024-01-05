@@ -233,6 +233,19 @@ class LinearQ(nn.Module):
             Tensor containing the approximate value of the given state. 
         """
         return self.line(self.feature_mapping(x))
+    
+class ActorCritic(nn.Module):
+    """
+    Housing of the policy and value functions 
+    in the same place. 
+    """
+    def __init__(self, policy, value):
+        super(ActorCritic, self).__init__()
+        self.policy = policy
+        self.value = value
+    
+    def forward(self, x):
+        return self.policy.forward(x), self.value.forward(x)
 
 class RLBase(ABC):
     """
