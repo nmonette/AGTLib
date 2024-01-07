@@ -19,3 +19,9 @@
 3. Multi-Agent A3C (?)
     - implementing asynchronous gradient descent for multiple agents may prove to be difficult
 Future Stuff (from the future folder)
+
+Baselines Imports
+1. monitor
+2. utils
+3. running_mean_std
+4. atari_wrappers

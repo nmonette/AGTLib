@@ -3,10 +3,9 @@ from typing import Callable
 
 from gymnasium.wrappers.monitoring import video_recorder
 
-from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvObs, VecEnvStepReturn, VecEnvWrapper
-from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
-from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
-
+from .base_vec_env import VecEnv, VecEnvObs, VecEnvStepReturn, VecEnvWrapper
+from .dummy_vec_env import DummyVecEnv
+from .subproc_vec_env import SubprocVecEnv
 
 class VecVideoRecorder(VecEnvWrapper):
     """

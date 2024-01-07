@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 from gymnasium import spaces
 
-from stable_baselines3.common.preprocessing import check_for_nested_spaces
-from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs
+from ..preprocessing import check_for_nested_spaces
+from .base_vec_env import VecEnvObs
 
 
 def copy_obs_dict(obs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:

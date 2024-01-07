@@ -10,6 +10,8 @@ from agtlib.cooperative.ppo import PPO
 from agtlib.utils.rollout import RolloutManager
 from agtlib.utils.env import SingleAgentEnvWrapper
 
+from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
+
 def foo():
     lock = mp.Lock()
     lock.acquire(block=True)
@@ -42,24 +44,19 @@ if __name__ == "__main__":
     #     print("1: ", mw1.get_strategy())
     #     print("2: ", mw2.get_strategy())
 
-    env = gym.make("CartPole-v1", render_mode="human")
-    env = SingleAgentEnvWrapper(env)
+    # env = gym.make("CartPole-v1", render_mode="human")
+    # env = SingleAgentEnvWrapper(env)
     ppo = PPO(2, 4)
 
+    def create_env():
+        env = gym.make("CartPole-v1", render_mode="human")
+        # env = SingleAgentEnvWrapper(env)
+        return env
+
+    multi_env = SubprocVecEnv([create_env for _ in range(1)])
     for epoch in range(100):
-        rollout = RolloutManager(30, env, [ppo.policy], [ppo.value])
-        # buffer = rollout.rollout()[0]
-        p =  mp.Pool(5)
-        buffers = p.map(rollout.rollout) # Figure out how to use map
-        p.close()
-        p.join()
-        ppo.train(buffers[0])
-        '''
-        mp.set_start_method('spawn')
-        p = [mp.Process(target=foo) for i in range(5)]
-        for i in p:
-            i.start()
-            i.join()
-        # for i in p:
-        '''
+        rollout = RolloutManager(10, multi_env, [ppo.policy], [ppo.value])
+        buffer = rollout.rollout()[0]
+
+        ppo.train(buffer)
 # pdoc --docformat numpy agtlib

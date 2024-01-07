@@ -3,6 +3,7 @@ from typing import Iterable, List, Dict, DefaultDict, Union
 import torch
 import gymnasium as gym
 import numpy as np
+from collections import defaultdict
 
 from ..cooperative.base import PolicyNetwork, ValueNetwork, LinearValue
 
@@ -74,12 +75,12 @@ class RolloutBuffer:
         """
         
         self.obs_buffer = torch.stack(self.obs_buffer) 
-        self.log_prob_buffer = torch.tensor(self.log_prob_buffer) 
-        self.action_buffer = torch.tensor(self.action_buffer) 
-        self.reward_buffer = torch.tensor(self.reward_buffer) 
-        self.adv_buffer = torch.tensor(self.adv_buffer[::-1]) 
-        self.value_buffer = torch.tensor(self.value_buffer[::-1]) 
-        self.return_buffer = torch.tensor(self.return_buffer[::-1]) 
+        self.log_prob_buffer = torch.tensor(self.log_prob_buffer, dtype=torch.float32) 
+        self.action_buffer = torch.tensor(self.action_buffer, dtype=torch.float32) 
+        self.reward_buffer = torch.tensor(self.reward_buffer, dtype=torch.float32) 
+        self.adv_buffer = torch.tensor(self.adv_buffer[::-1], dtype=torch.float32) 
+        self.value_buffer = torch.tensor(self.value_buffer[::-1], dtype=torch.float32) 
+        self.return_buffer = torch.tensor(self.return_buffer[::-1], dtype=torch.float32) 
 
         perm = np.random.permutation(self.rollout_length) 
 
@@ -158,7 +159,7 @@ class RolloutManager:
         if len(self.values) != len(self.value_groups):
             for agent in range(len(self.values)):
                 for t in range(1, timesteps):
-                    obs = torch.flatten(torch.tensor([buffers[i].obs_buffer[-t] for i in range(len(self.value_groups)) if self.value_groups[i] == agent]))
+                    obs = torch.flatten([buffers[i].obs_buffer[-t] for i in range(len(self.value_groups)) if self.value_groups[i] == agent])
                     value1 = buffers[agent].value_buffer[t-2] if t != 1 else 0 # V(s_{t+1}) 
                     value2 = self.values[agent].forward(obs).item() # V(s_t)
                     prev_adv = buffers[agent].adv_buffer[t-2] if t != 1 else 0 
@@ -190,35 +191,50 @@ class RolloutManager:
             Dictionary such that each key corresponds to an agent, and the key refers to a rollout buffer.
         """
         buffers = [RolloutBuffer(self.rollout_length) for _ in range(len(self.policy_groups))]
-        
+
+        n_envs = 1
+
         for i in range(self.rollout_length): # we should turn the block of this code into a function so that we can parallelize it
-            obs, _ = self.env.reset()
-            self.env.render()
+            obs = self.env.reset()
+            # self.env.render() # temporary
             
-            for i in range(len(self.policy_groups)):
-                obs[i] = torch.from_numpy(obs[i])
-                buffers[i].obs_buffer.append(obs[i])
+            # for j in range(len(self.policy_groups)):
+            new_obs = []
+            for k in range(n_envs): # will need to account for multi-agent later
+                new_obs.append(torch.from_numpy(obs[k]).float())
+                buffers[0].obs_buffer.append(new_obs[k])
 
             timesteps = 0 
-            while True: # completes one episode in the environment  TODO: change this to fixed-length segments "much shorter" than an episode
+            for t in range(5): # completes one episode in the environment  TODO: change this to fixed-length segments "much shorter" than an episode
+                
+                currrent_action = defaultdict(lambda: np.ndarray((n_envs, ), dtype=np.int32))
+                for j in range(n_envs):
+                    for k in range(len(self.policy_groups)): # sampling actions and log probs
+                        action, log_prob = self.policies[self.policy_groups[k]].get_action(new_obs[j]) #[j][k]
+                        currrent_action[k][j] = action.to(torch.int32).item()
+                        buffers[k].action_buffer.append(currrent_action[k][j])
+                        buffers[k].log_prob_buffer.append(log_prob)
 
-                currrent_action = {}
-                for j in range(len(self.policy_groups)): # sampling actions and log probs
-                    action, log_prob = self.policies[self.policy_groups[j]].get_action(obs[j])
-                    currrent_action[j] = action.item()
-                    buffers[i].action_buffer.append(currrent_action[j])
-                    buffers[i].log_prob_buffer.append(log_prob)
-
-                obs, reward, done, trunc, _ = self.env.step(currrent_action)
-                obs = {i: torch.from_numpy(obs[i]) for i in range(len(obs))}
+                self.env.step_async(currrent_action[0])
+                obs, reward, done, _ = self.env.step_wait() # removed trunc
+                # obs = {i: torch.from_numpy(obs[i]) for i in range(len(obs))}
+                obs = {j: torch.from_numpy(obs[j]).float() for j in range(n_envs)}
 
                 for j in range(len(buffers)):
-                    buffers[j].obs_buffer.append(obs[j])
-                    buffers[j].reward_buffer.append(reward[j])
+                    for k in range(len(obs)):
+                        buffers[j].obs_buffer.append(obs[k]) # need to modify once it is a dict of observations
+                        buffers[j].reward_buffer.append(reward[k]) # same with this
 
-                if done or trunc: # we may need to put in some kind of modification here for if the episode is truncated
-                    break
-                
+                if done: # we may need to put in some kind of modification here for if the episode is truncated
+                    obs = self.env.reset()
+                    # self.env.render()
+                    # for j in range(len(self.policy_groups)):
+                    new_obs = []
+                    for k in range(n_envs): # will need to account for multi-agent later
+                        new_obs.append(torch.from_numpy(obs[k]).float())
+                        buffers[0].obs_buffer.append(new_obs[k])
+                    timesteps += 1
+                        
                 timesteps += 1
 
             self.calculate_adv(buffers, timesteps)

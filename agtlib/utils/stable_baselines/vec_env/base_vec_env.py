@@ -1,3 +1,7 @@
+"""
+Imports cv2, may be necessary to add to requirements.txt
+"""
+
 import inspect
 import warnings
 from abc import ABC, abstractmethod

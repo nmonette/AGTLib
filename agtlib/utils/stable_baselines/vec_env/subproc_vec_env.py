@@ -7,14 +7,14 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from stable_baselines3.common.vec_env.base_vec_env import (
+from .base_vec_env import (
     CloudpickleWrapper,
     VecEnv,
     VecEnvIndices,
     VecEnvObs,
     VecEnvStepReturn,
 )
-from stable_baselines3.common.vec_env.patch_gym import _patch_env
+from .patch_gym import _patch_env
 
 
 def _worker(
@@ -23,7 +23,7 @@ def _worker(
     env_fn_wrapper: CloudpickleWrapper,
 ) -> None:
     # Import here to avoid a circular import
-    from stable_baselines3.common.env_util import is_wrapped
+    from ..env_util import is_wrapped
 
     parent_remote.close()
     env = _patch_env(env_fn_wrapper.var())
