@@ -118,8 +118,6 @@ class PPO(RLBase):
 
         policy_params = nn.utils.parameters_to_vector(self.policy.parameters())
         value_params = nn.utils.parameters_to_vector(self.value.parameters())
-        print(policy_params.is_leaf)
-        print(value_params.is_leaf)
 
         self.actor_critic = ActorCritic(self.policy, self.value)
         self.optimizer = torch.optim.Adam(self.actor_critic.parameters()) # can make it so that there are other compatible optimizers in the future

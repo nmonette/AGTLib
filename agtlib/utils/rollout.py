@@ -1,5 +1,4 @@
 from typing import Iterable, List, Dict, DefaultDict, Union
-from collections import defaultdict
 
 import torch
 import gymnasium as gym
@@ -201,7 +200,7 @@ class RolloutManager:
                 buffers[i].obs_buffer.append(obs[i])
 
             timesteps = 0 
-            while True: # completes one episode in the environment
+            while True: # completes one episode in the environment  TODO: change this to fixed-length segments "much shorter" than an episode
 
                 currrent_action = {}
                 for j in range(len(self.policy_groups)): # sampling actions and log probs
@@ -225,13 +224,5 @@ class RolloutManager:
             self.calculate_adv(buffers, timesteps)
 
         return buffers
-
-        
-        
-
-                
-                
-
-            
 
 
