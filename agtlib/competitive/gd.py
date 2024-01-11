@@ -13,11 +13,11 @@ class VanillaGradientDescent:
     https://panageas.github.io/agt23slides/L10%20Other%20equilibrium%20notions.pdf.
     """
     
-    def __init__(self, num_actions: int, initial: torch.Tensor = None, stepsize = 0.01) -> None:
+    def __init__(self, n_actions: int, initial: torch.Tensor = None, stepsize = 0.01) -> None:
         """
         Parameters
         ----------
-        num_actions: int
+        n_actions: int
             The number of actions in the action space for the player performing Gradient Descent. 
         initial: torch.Tensor, optional
             The initial strategy for the player.
@@ -27,10 +27,10 @@ class VanillaGradientDescent:
             The stepsize for gradient descent. Defaults to `0.01`.
 
         """
-        self.num_actions = num_actions
+        self.n_actions = n_actions
         
         if initial is None:
-            self.current = torch.tensor([1/num_actions for _ in range(num_actions)], requires_grad=True)
+            self.current = torch.tensor([1/n_actions for _ in range(n_actions)], requires_grad=True)
         elif not initial.requires_grad:
             raise GradDisabledException("initial")
         elif torch.sum(initial).item() != 1 or torch.any(torch.lt(initial, 0)).item():

@@ -127,18 +127,18 @@ class LinearValue(nn.Module):
     Linear function approximation
     of the value function.
     """
-    def __init__(self, obs_size: int, num_features: int) -> None:
+    def __init__(self, obs_size: int, n_features: int) -> None:
         """
         Parameters
         ----------
         obs_size: int
             The length of the flattened observation of the agent(s). 
-        num_features: int
+        n_features: int
             The number of features that the linear regression will process. 
         """
         super(LinearValue, self).__init__()
-        self.feature_mapping = nn.Linear(obs_size, num_features)
-        self.line = nn.Linear(num_features, 1)
+        self.feature_mapping = nn.Linear(obs_size, n_features)
+        self.line = nn.Linear(n_features, 1)
 
     def forward(self, x) -> torch.Tensor:
         """
@@ -204,18 +204,18 @@ class LinearQ(nn.Module):
     Linear function approximation 
     of the Q (state-action) function.
     """
-    def __init__(self, obs_size: int, num_features: int) -> None:
+    def __init__(self, obs_size: int, n_features: int) -> None:
         """
         Parameters
         ----------
         obs_size: int
             The length of the flattened observation of the agent(s). 
-        num_features: int
+        n_features: int
             The number of features that the linear regression will process. 
         """
         super(LinearQ, self).__init__()
-        self.feature_mapping = nn.Linear(obs_size, num_features)
-        self.line = nn.Linear(num_features, 1)
+        self.feature_mapping = nn.Linear(obs_size, n_features)
+        self.line = nn.Linear(n_features, 1)
 
     def forward(self, x) -> torch.Tensor:
         """

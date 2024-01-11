@@ -1,4 +1,5 @@
-from typing import Iterable
+from typing import Iterable, Callable
+from collections import defaultdict
 
 import numpy as np
 import torch
@@ -8,6 +9,10 @@ import gymnasium as gym
 
 from .base import RLBase, PolicyNetwork, ValueNetwork, ActorCritic
 from ..utils.rollout import RolloutBuffer, RolloutManager
+
+from agtlib.utils.stable_baselines.vec_env.base_vec_env import VecEnv
+from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
+from agtlib.utils.stable_baselines.monitor import Monitor
 
 class PPO(RLBase):
     """
@@ -120,7 +125,7 @@ class PPO(RLBase):
         value_params = nn.utils.parameters_to_vector(self.value.parameters())
 
         self.actor_critic = ActorCritic(self.policy, self.value)
-        self.optimizer = torch.optim.Adam(self.actor_critic.parameters()) # can make it so that there are other compatible optimizers in the future
+        self.optimizer = torch.optim.Adam(self.actor_critic.parameters(), eps=1e-5) # can make it so that there are other compatible optimizers in the future
 
     def preprocess(self, obs: torch.Tensor):
         '''
@@ -171,7 +176,7 @@ class PPO(RLBase):
 
         return values, log_prob, entropy 
 
-    def train(self, buffer: RolloutBuffer, num_epochs: int = 1, batch_size: int = 32) -> None:
+    def train(self, buffer: RolloutBuffer, n_epochs: int = 1, batch_size: int = 32) -> None:
         """
         Performs a training update with rollout data.
         Intended to be performed in parallel with 
@@ -180,7 +185,7 @@ class PPO(RLBase):
         ---------
         buffer: RolloutBuffer
             Data collected from the rollout.
-        num_epochs: int, optional
+        n_epochs: int, optional
             Number of passes for the model to go through 
             the rollout data. Defaults to `1`.
         batch_size: int, optional
@@ -193,7 +198,7 @@ class PPO(RLBase):
         pg_losses, value_losses = [], []
         clip_fractions = []
         
-        for epoch in range(num_epochs):
+        for epoch in range(n_epochs):
             approx_kl_divs = []
             for data in buffer.get_data(batch_size):
                 actions = data.action_buffer
@@ -266,6 +271,28 @@ class PPO(RLBase):
             if not continue_training:
                 break
 
+def train_ppo():
+    ppo = PPO(2, 4, policy_hl_dims=[16], value_hl_dims=[16])
+
+    def create_env():
+        env = Monitor(gym.make("CartPole-v1"))
+        # env = SingleAgentEnvWrapper(env)
+        return env
+
+    multi_env = SubprocVecEnv([create_env for _ in range(10)])
+    next_obs = multi_env.reset()
+    for epoch in range(100):
+        rollout = RolloutManager(5, multi_env, [ppo.policy], [ppo.value], n_envs=10)
+        buffer, next_obs = rollout.rollout(next_obs)
+        buffer = buffer[0]
+
+        ppo.train(buffer, 5, 64)
+
+    x = [torch.tensor(y) for y in multi_env.env_method("get_episode_rewards")]
+    print("mean reward:", torch.mean(torch.cat(x)).item())
+
+    multi_env.close()
+
 
 # class MAPPO(PPO):
 #     ## TO DO: fix this, code was written for sake of explanation
@@ -283,5 +310,163 @@ class PPO(RLBase):
 #                 self.policies[j].train(data[j])
 
 class IPPO:
-    pass
+    """
+    Fully independent Multi-agent PPO. Only supports 
+    homogeneous action spaces. 
+    """
+    def __init__(self, action_size: int, obs_size: int, n_agents: int, *, v_obs_size: int = None, policy_hl_dims: Iterable[int, ] = [64,128], \
+                 value_hl_dims: Iterable[int, ] = [64, 128], linear_value: bool = False, gamma: float = 0.99, \
+                    gae_lambda: float = 0.95, clip_range: float = 0.2, clip_range_vf: float = 0.2,
+                    vf_coef: float = 0.5, ent_coef: float = 0.0, target_kl: float = None, normalize_advantage: bool = True, 
+                    verbose: int = 0, max_grad_norm: float = 0.5):
+        '''
+        Initialize PPO parameters.
+        Parameters
+        -------
+        action_size: int
+            The cardinality of the action space of a single agent.
+        obs_size: int
+            The length of the flattened observation of the agent(s). 
+        n_agents: int
+            The number of agents in the environment. Agent groups (e.g. 
+            teams) are not needed to be specified as per the independent
+            nature of the model.
+        v_obs_size: int, optional, keyword only
+            The length of the flattened observation size of the agent(s).
+            Only specify if different from policy `obs_size` (e.g. the 
+            policy network uses locallized observations, but the value 
+            network uses the joint observation of multiple agents).
+        policy_hl_dims: Iterable(int), optional, keyword only
+            An iterable such that the ith element represents 
+            the width of the ith hidden layer
+            of the policy network. Defaults to `[64,128]`.
+            Note that this does not include the 
+            input or output layers.
+        value_hl_dims: Iterable(int), optional, keyword only
+            An iterable such that the ith element represents the 
+            width of the ith hidden layer of the value network. 
+            Defaults to `[64,128]`. Note that this does not include 
+            the input or output layers. Must be length 1 if linear_value 
+            is enabled, with the value equal to the number 
+            of linear features.
+        linear_value: bool, optional, keyword only
+            Indicates whether or not the value function is to be 
+            approximated linearly. Defaults to `False`.
+        gamma: float, optional, keyword only
+            The dicount factor. Defaults to `0.99`.
+        gae_lambda: float, optional, keyword only
+            Factor for trade-off of bias vs variance for Generalized Advantage Estimator
+            Defaults to `0.95`.
+        clip_range: float, optional, keyword only
+            The clip range of the ratio for the policy Defaults to `0.2`,
+            meaning the value is restricted to 1.2 and 0.8.
+        clip_range_vf: float, optional, keyword only
+            The clip range for the value function. Defaults to `0.2`, 
+            meaning the value is restricted to 1.2 and 0.8.
+        vf_coef: float, optional, keyword only
+            Coefficient for the Value function in the calculation of loss.
+            Defaults to `0.5`.__async_iterable 
+        ent_coef: float, optional, keyword only
+            Coefficient for the entropy in the calculation of loss. 
+            Defaults to `0.0`.
+        target_kl: float, optional, keyword only
+            KL divergence between old and new policies
+            that stops training when reached.
+            Defaults to `None`. 
+        normalize_advantage: bool, optional, keyword only
+            Boolean for determining whether to normalize the advantage. 
+            Defaults to `True`.
+        max_grad_norm: float, optional, keyword
+            Maximum value for the clipping of the gradient. Defaults to `0.5`.
+        '''
+        self.ppo = [PPO(action_size, obs_size, 
+                        v_obs_size=v_obs_size, 
+                        policy_hl_dims=policy_hl_dims,
+                        value_hl_dims=value_hl_dims,
+                        linear_value=linear_value,
+                        gamma=gamma, 
+                        gae_lambda=gae_lambda,
+                        clip_range=clip_range,
+                        clip_range_vf=clip_range_vf,
+                        vf_coef=vf_coef,
+                        ent_coef=ent_coef,
+                        target_kl=target_kl,
+                        normalize_advantage=normalize_advantage,
+                        verbose=verbose,
+                        max_grad_norm=max_grad_norm) 
+                        for _ in range(len(n_agents))]
+        
+        self.gamma = gamma
+        self.gae_lambda = gae_lambda
+        
+        # self.n_agents = n_agents
 
+    def train(self, env_id: Callable[[None], gym.Env], *, n_envs: int = 1, rollout_length: int = 100, batch_size: int = 32, n_epochs: int = 10, n_updates: int = 1000):
+        """
+        Function to handle training of the models. 
+        Parameters
+        ----------
+        make_env: Callable() -> gym.Env
+            Callable that returns a gym.Env. 
+        n_envs: int, optional
+            Number of environments to run in parallel during rollouts. 
+            Defaults to `1`. 
+        rollout_length: int, optional
+            Length (per environment) of the "fixed-length trajectory segments" as per the 
+            seminal PPO paper (https://arxiv.org/pdf/1707.06347.pdf).
+        batch_size: int, optional
+            Length of the minibatches of data that is processed at a time per training update.
+            Defaults to `32`.
+        n_epochs: int, optional
+            Number of epochs (i.e. passes through a batch) per training update.
+            Defaults to `10`.
+        n_updates: int, optional
+            Number of training updates. The real number of updates is equal to 
+            `n_updates * n_epochs * (rollout_length * n_envs // batch_size)`.
+            Defaults to 1000.
+        """
+        make_env = lambda: Monitor(make_env())
+        
+        policies = []
+        values = []
+        for ppo in self.ppo:
+            policies.append(ppo.policy)
+            values.append(ppo.value)
+
+        env = SubprocVecEnv([make_env for _ in range(n_envs)])
+        next_obs = env.reset()
+
+        for update in range(n_updates):
+            rm = RolloutManager(rollout_length, env, policies, values, gamma=self.gamma, gae_lambda=self.gae_lambda, n_envs=n_envs)
+            buffers, next_obs = rm.rollout(next_obs)
+
+            for i in range(len(self.ppo)): # do we want to parallelize this... can we even do that?
+                self.ppo[i].train(buffers[i], n_epochs, batch_size)
+
+        rewards = env.env_method("get_episode_rewards")
+        mean_rewards = defaultdict(int)
+        count = 0
+        for i in range(len(rewards)):
+            for j in rewards[i]:
+                for k in range(len(self.ppo)):
+                    mean_rewards[k] += j[k]
+                count += 1
+        
+        for i in range(len(mean_rewards)):
+            mean_rewards[i] = mean_rewards[i] / count
+
+        print("mean rewards:")
+        for i in range(len(self.ppo)):
+            print(i, ': ', mean_rewards[i])
+                
+
+
+
+
+
+
+
+
+        
+        
+        

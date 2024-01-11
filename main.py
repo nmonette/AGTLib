@@ -11,6 +11,7 @@ from agtlib.utils.rollout import RolloutManager
 from agtlib.utils.env import SingleAgentEnvWrapper
 
 from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
+from agtlib.utils.stable_baselines.monitor import Monitor
 
 def foo():
     lock = mp.Lock()
@@ -46,17 +47,36 @@ if __name__ == "__main__":
 
     # env = gym.make("CartPole-v1", render_mode="human")
     # env = SingleAgentEnvWrapper(env)
-    ppo = PPO(2, 4)
+    ppo = PPO(2, 4, policy_hl_dims=[16], value_hl_dims=[16])
 
     def create_env():
-        env = gym.make("CartPole-v1", render_mode="human")
+        env = Monitor(gym.make("CartPole-v1"))
         # env = SingleAgentEnvWrapper(env)
         return env
 
-    multi_env = SubprocVecEnv([create_env for _ in range(1)])
+    multi_env = SubprocVecEnv([create_env for _ in range(10)])
+    next_obs = multi_env.reset()
     for epoch in range(100):
-        rollout = RolloutManager(10, multi_env, [ppo.policy], [ppo.value])
-        buffer = rollout.rollout()[0]
+        rollout = RolloutManager(5, multi_env, [ppo.policy], [ppo.value])
+        buffer, next_obs = rollout.rollout(next_obs)
+        buffer = buffer[0]
 
-        ppo.train(buffer)
-# pdoc --docformat numpy agtlib
+        ppo.train(buffer, 5, 64)
+
+    x = [torch.tensor(y) for y in multi_env.env_method("get_episode_rewards")]
+    print(torch.mean(torch.cat(x)))
+
+    multi_env.close()
+
+    env = gym.make("CartPole-v1", render_mode="human")
+    for demo in range(100):
+        obs, _ = env.reset()
+        env.render()
+        while True:
+            obs, reward, done, trunc, _ = env.step(ppo.policy.get_action(torch.from_numpy(obs))[0].item())
+    
+            if done or trunc:
+                break
+            
+    print("end")
+    # pdoc --docformat numpy agtlib
