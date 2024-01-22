@@ -1,4 +1,8 @@
 # TO DO !
+## MultiGrid Env:
+1. Randomize Initializations
+2. Make agents vanish when they reach their goal
+
 ## GAE (agtlib.utils.rollout)
 1. Transition From Dictionaries to a buffer for each agent
     - this requires us to duplicate the advantage list for each agent

@@ -1,82 +1,63 @@
 import multiprocessing as mp
+from random import randint
 
 import numpy as np
 # from agtlib.competitive.mwu import MultiplicativeWeights 
 import gymnasium as gym
+from gymnasium import register
 
 import torch
 
-from agtlib.cooperative.ppo import PPO
+from tests.gd_test import test_gd
+from agtlib.cooperative.base import PolicyNetwork
+from agtlib.cooperative.ppo import PPO, IPPO
 from agtlib.utils.rollout import RolloutManager
-from agtlib.utils.env import SingleAgentEnvWrapper
+from agtlib.utils.env import SingleAgentEnvWrapper, MultiGridWrapper
 
 from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
 from agtlib.utils.stable_baselines.monitor import Monitor
 
-def foo():
-    lock = mp.Lock()
-    lock.acquire(block=True)
-    for i in range(1000):
-        print(i)
-    lock.release()
 
+from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
+import multigrid
 
 if __name__ == "__main__":
-    # game = np.stack([
-    #     np.array([0, 1, -1]), 
-    #     np.array([1, 0, -1]), 
-    #     np.array([-1, 1, 0]), 
-    # ])
-    # mw1 = MultiplicativeWeights(game, 0.5)
-    # mw2 = MultiplicativeWeights(-game, 0.5)
     
-    # converged1 = False
-    # converged2 = False
-    # for i in range(100000):
-    #     move1 = mw1.get_action().item()
-    #     move2 = mw2.get_action().item()
-
-    #     converged1 = mw1.step(move2)
-    #     converged2 = mw2.step(move1)
-
-    #     # if converged1 and converged2:
-    #     #     break
-
-    #     print("1: ", mw1.get_strategy())
-    #     print("2: ", mw2.get_strategy())
-
-    # env = gym.make("CartPole-v1", render_mode="human")
-    # env = SingleAgentEnvWrapper(env)
-    ppo = PPO(2, 4, policy_hl_dims=[16], value_hl_dims=[16])
-
-    def create_env():
-        env = Monitor(gym.make("CartPole-v1"))
-        # env = SingleAgentEnvWrapper(env)
-        return env
-
-    multi_env = SubprocVecEnv([create_env for _ in range(10)])
-    next_obs = multi_env.reset()
-    for epoch in range(100):
-        rollout = RolloutManager(5, multi_env, [ppo.policy], [ppo.value])
-        buffer, next_obs = rollout.rollout(next_obs)
-        buffer = buffer[0]
-
-        ppo.train(buffer, 5, 64)
-
-    x = [torch.tensor(y) for y in multi_env.env_method("get_episode_rewards")]
-    print(torch.mean(torch.cat(x)))
-
-    multi_env.close()
-
-    env = gym.make("CartPole-v1", render_mode="human")
-    for demo in range(100):
-        obs, _ = env.reset()
-        env.render()
-        while True:
-            obs, reward, done, trunc, _ = env.step(ppo.policy.get_action(torch.from_numpy(obs))[0].item())
+    # CONFIGURATIONS = {
+    #         'MultiGrid-Empty-8x8-Team': (TeamEmptyEnv, {'size': 8, "agents": 4, "allow_agent_overlap":True, "max_steps":3000})
+    #     }
+        
+    # for name, (env_cls, config) in CONFIGURATIONS.items():
+    #     register(id=name, entry_point=env_cls, kwargs=config)
     
-            if done or trunc:
-                break
-            
+    # ippo = IPPO(4, 148, 4)
+    # ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team")), n_envs = 32, n_updates=1000, rollout_length=30)
+   
+    # policies = []
+    # for i in range(len(ippo.ppo)):
+    #     policies.append(ippo.ppo[i].policy)
+    #     torch.save(policies[-1].state_dict(), f"policy_{i}.pt")
+    
+    
+    # policies = [PolicyNetwork(148, 4) for i in range(4)] # []
+    # for i in range(len(policies)):
+    #     policies[i].load_state_dict(torch.load(f"policy_{i}.pt"))
+        
+    # env = MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", render_mode="human"))
+    # for i in range(100):
+    #     obs, _ = env.reset()
+    #     env.render()
+    #     while True:
+    #         action = {}
+    #         for j in range(len(policies)):
+    #             action[j] = policies[j].get_action(torch.from_numpy(obs[j]).float())[0].int().item()
+
+    #         obs, reward, trunc, done, _ = env.step(action)
+
+    #         if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+    #             break
+
+
+    test_gd()
     print("end")
     # pdoc --docformat numpy agtlib

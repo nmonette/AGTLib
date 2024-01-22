@@ -2,13 +2,14 @@ from typing import Union
 
 import numpy as np
 import torch 
-from torch.nn import Softmax
 
 from ..utils.exceptions import GradDisabledException, StrategyNotInSimplexException
+from ..utils.projection import project_simplex, projection_simplex_sort, nate_projection, project_simplex_2
 
 class VanillaGradientDescent:
     """
-    Implementation of Vanilla Gradient Descent. For more details on its theory, view 
+    Implementation of Projected Gradient Descent onto the Simplex. 
+    For more details on its theory, view 
     `Theory.gd`. Algorithm pseudocode sourced from 
     https://panageas.github.io/agt23slides/L10%20Other%20equilibrium%20notions.pdf.
     """
@@ -60,14 +61,10 @@ class VanillaGradientDescent:
 
         loss = torch.tensor(-utility, requires_grad = True, dtype=torch.float64) # -utility #
         loss.backward()
-        next = (self.current.data - self.stepsize * loss.grad.data).softmax(-1)
+        # next = (self.current.data - self.stepsize * loss.grad.data).softmax(-1) 
+        x = self.current.data - self.stepsize * loss.grad.data
+        self.current =  projection_simplex_sort(x)
         loss.grad.data.zero_()
-        if torch.equal(next,self.current):
-            return True
-        else:
-            self.current = next
-            return False
-        
 
     def get_action(self) -> int:
         """

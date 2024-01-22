@@ -1,7 +1,7 @@
 import numpy as np
 from ...agtlib.competitive.mwu import MultiplicativeWeights 
 
-if __name__ == "__main__":
+def test_mwu():
     game = np.stack([
         np.array([0, 1, -1]), 
         np.array([1, 0, -1]), 

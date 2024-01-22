@@ -246,13 +246,27 @@ class ActorCritic(nn.Module):
     
     def forward(self, x):
         return self.policy.forward(x), self.value.forward(x)
-
+    
+class ActorCriticCTDE(nn.Module):
+    """
+    Housing of the policy and value functions 
+    in the same place. Used for CTDE models.
+    """
+    def __init__(self, policies, value):
+        super(ActorCritic, self).__init__()
+        self.policies = policies
+        self.value = value
+    
+    def forward(self, x):
+        return *[policy.forward(x) for policy in range(len(self.policies))], self.value.forward(x)
+    
 class RLBase(ABC):
     """
     Base class for RL models to override.
     """
     def __init__(self, action_size: int, obs_size: int, *, v_obs_size: int = None, policy_hl_dims: Iterable[int, ] = [64,128], \
-                 value_hl_dims: Iterable[int, ] = [64, 128], linear_value: bool = False, value_type: str = "V", gamma: float = 0.99) -> None:
+                 value_hl_dims: Iterable[int, ] = [64, 128], linear_value: bool = False, value_type: str = "V", gamma: float = 0.99, \
+                 n_policies: int = 1) -> None:
         """
         Parameters
         ----------
@@ -283,6 +297,8 @@ class RLBase(ABC):
         gamma: float, optional, keyword only
             The discount factor to be used in the calculation of expectations. Must be in the range
             `[0,1]` for (finite time horizons). Defaults to `0.99`.
+        n_policies: int, optional, keyword only
+            The amount of policy networks to instantiate. Defaults to `1`.
         """
         self.action_size = action_size  
         self.obs_size = obs_size
@@ -324,7 +340,10 @@ class RLBase(ABC):
         else:
             self.value = QNetwork(self.v_obs_size, self.value_hl_dims)
 
-        self.policy = PolicyNetwork(self.obs_size, self.action_size, self.policy_hl_dims)
+        if n_policies == 1:
+            self.policy = PolicyNetwork(self.obs_size, self.action_size, self.policy_hl_dims)
+        else:
+            self.policy = [PolicyNetwork(self.obs_size, self.action_size, self.policy_hl_dims) for _ in range(n_policies)]
         
     @abstractmethod
     def train(self, utility) -> None:
