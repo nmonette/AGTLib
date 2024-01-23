@@ -56,7 +56,6 @@ class PolicyNetwork(nn.Module):
             x = torch.nn.ReLU()(self.layers[i](x))
         return self.layers[-1](x)
 
-    @torch.no_grad()
     def get_action(self, x: torch.Tensor) -> int:
         """
         Samples an action from the current policy and returns it as an integer index.

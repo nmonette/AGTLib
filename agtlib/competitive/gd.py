@@ -44,6 +44,10 @@ class VanillaGradientDescent:
         else:
             self.stepsize = stepsize
 
+        self.optimizer = torch.optim.Adam([self.current], stepsize)
+
+        self.hist = []
+
     def step(self, utility: Union[int, float]) -> bool:
         """
         Updates `self.current` with the next gradient step. 
@@ -58,13 +62,26 @@ class VanillaGradientDescent:
         bool
             True if the algorithm has converged (up to a limited point of precision).
         """
-
-        loss = torch.tensor(-utility, requires_grad = True, dtype=torch.float64) # -utility #
+        """
+        loss = -utility 
+        self.optimizer.zero_grad()
+        loss.backward() # commented out because we are passing in gradient
+        self.optimizer.step()
+        with torch.no_grad():
+            self.current = projection_simplex_sort(self.current)
+        """
+        
+        loss = -utility
         loss.backward()
-        # next = (self.current.data - self.stepsize * loss.grad.data).softmax(-1) 
-        x = self.current.data - self.stepsize * loss.grad.data
-        self.current =  projection_simplex_sort(x)
-        loss.grad.data.zero_()
+
+        x = self.current - self.stepsize * self.current.grad
+        self.current.grad.zero_()
+
+        with torch.no_grad():
+            self.current = projection_simplex_sort(x)
+            self.hist.append(x)
+        
+       #  self.current = torch.tensor(x, requires_grad=True)
 
     def get_action(self) -> int:
         """

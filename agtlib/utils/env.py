@@ -49,14 +49,14 @@ class MultiGridWrapper(gym.Wrapper):
     def reset(self, *args, **kwargs):
         obs, _ = self.env.reset(**kwargs)
         for i in obs:
-            obs[i] = np.concatenate((obs[i]["image"].flatten(), obs[i]["direction"].flatten()))
+            obs[i] = np.concatenate((obs[i]["image"].flatten(), np.array(obs[i]["index"]).flatten() ))
 
         return obs, _
 
     def step(self, action: dict):
         obs, reward, done, trunc, _ = self.env.step(action)
         for i in obs:
-            obs[i] = np.concatenate((obs[i]["image"].flatten(), obs[i]["direction"].flatten()))
+            obs[i] = np.concatenate((obs[i]["image"].flatten(), np.array(obs[i]["index"]).flatten()))
 
         return obs, reward, done, trunc, _
 

@@ -73,7 +73,7 @@ def projection_simplex_sort(v, z=1):
     rho = ind[cond][-1]
     theta = cssv[cond][-1] / float(rho)
     w = np.maximum(v - theta, 0)
-    return torch.tensor(w)
+    return torch.tensor(w, requires_grad=True)
 
 def nate_projection(v, z=1):
     mu = torch.sort(v)[0]
