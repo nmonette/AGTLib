@@ -11,6 +11,7 @@ import torch
 
 from tests.gd_test import test_gd
 from tests.gdmax_test import test_gdmax
+from agtlib.runners.gdmax_experiments import grid_experiment_3x3
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import PPO, IPPO
 from agtlib.utils.rollout import RolloutManager
