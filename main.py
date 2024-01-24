@@ -10,10 +10,11 @@ from gymnasium import register
 import torch
 
 from tests.gd_test import test_gd
+from tests.gdmax_test import test_gdmax
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import PPO, IPPO
 from agtlib.utils.rollout import RolloutManager
-from agtlib.utils.env import SingleAgentEnvWrapper, MultiGridWrapper
+from agtlib.utils.env import SingleAgentEnvWrapper, MultiGridWrapper, generate_reward
 
 from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
 from agtlib.utils.stable_baselines.monitor import Monitor
@@ -23,16 +24,28 @@ from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
 import multigrid
 
 if __name__ == "__main__":
+    env_dict = gym.envs.registration.registry.copy()
+
+    # for env in env_dict:
+    #     if 'MultiGrid-Empty-8x8-Team' in env:
+    #         print("Remove {} from registry".format(env))
+    #         del gym.envs.registration.registry[env]
     
-    # CONFIGURATIONS = {
-    #         'MultiGrid-Empty-8x8-Team': (TeamEmptyEnv, {'size': 8, "agents": 4, "allow_agent_overlap":True, "max_steps":3000})
-    #     }
-        
-    # for name, (env_cls, config) in CONFIGURATIONS.items():
-    #     register(id=name, entry_point=env_cls, kwargs=config)
+    CONFIGURATIONS = {
+            'MultiGrid-Empty-6x6-Team': (TeamEmptyEnv, {'size': 8, "agents": 3, "allow_agent_overlap":True, "max_steps":3000}),
+            'MultiGrid-Empty-4x4-Team': (TeamEmptyEnv, {'size': 6, "agents": 3, "allow_agent_overlap":True, "max_steps":3000}),
+            'MultiGrid-Empty-3x3-Team': (TeamEmptyEnv, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":3000})
+        }
     
-    ippo = IPPO(4, 148, 4)
-    ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team")), n_envs = 32, n_updates=1000, rollout_length=30)
+    for name, (env_cls, config) in CONFIGURATIONS.items():
+        register(id=name, entry_point=env_cls, kwargs=config)
+
+    
+    # generate_reward(3, 3)
+    test_gdmax(MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)))
+    
+    # ippo = IPPO(4, 22, 3)
+    # ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", agents=3)), n_envs = 32, n_updates=1000, rollout_length=100)
    
     # policies = []
     # for i in range(len(ippo.ppo)):
@@ -43,21 +56,23 @@ if __name__ == "__main__":
     # policies = [PolicyNetwork(148, 4) for i in range(4)] # []
     # for i in range(len(policies)):
     #     policies[i].load_state_dict(torch.load(f"policy_{i}.pt"))
-        
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", render_mode="human"))
-    for i in range(100):
-        obs, _ = env.reset()
-        env.render()
-        while True:
-            action = {}
-            for j in range(4):
-                action[j] = randint(0,3)# policies[j].get_action(torch.from_numpy(obs[j]).float())[0].int().item()
+    
+    # policies = [0] * 3
 
-            obs, reward, trunc, done, _ = env.step(action)
-            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
-                break
+    # env = MultiGridWrapper(gym.make("MultiGrid-Empty-4x4-Team", render_mode="human"))
+    # for i in range(100):
+    #     obs, _ = env.reset()
+    #     env.render()
+    #     while True:
+    #         action = {}
+    #         for j in range(len(policies)):
+    #             action[j] = randint(0,3)# policies[j].get_action(torch.from_numpy(obs[j]).float())[0].int().item()
 
+    #         obs, reward, trunc, done, _ = env.step(action)
+    #         if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+    #             break
 
     # test_gd()
     print("end")
+    
     # pdoc --docformat numpy agtlib
