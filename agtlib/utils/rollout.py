@@ -215,7 +215,7 @@ class RolloutManager:
         
         return new_obs
     
-    def rollout(self, init_obs: (Dict[int, np.ndarray]), ) -> Dict[int, List[int, ]]: # may want to add a "calculate_advs" parameter
+    def rollout(self, init_obs: (Dict[int, np.ndarray]), action_map = None) -> Dict[int, List[int, ]]: # may want to add a "calculate_advs" parameter
         """
         Performs a monte carlo rollout, and then solves for the advantage estimator
         at each time step of the episode.
@@ -245,11 +245,28 @@ class RolloutManager:
             current_action = []
             for j in range(self.n_envs):
                 current_action.append({})
-                for k in range(len(self.policy_groups)): # sampling actions and log probs
-                    action, log_prob = self.policies[self.policy_groups[k]].get_action(new_obs[k][j])
-                    current_action[j][k] = action.to(torch.int32).item()
-                    buffers[k].action_buffer.append(current_action[j][k])
-                    buffers[k].log_prob_buffer.append(log_prob)
+                if self.model_name == "advPPO":
+                    # Team actions
+                    action, log_prob = self.policies[0].get_action(new_obs[0][j])
+                    team_actions = action_map[action.to(torch.int32).item()]
+                    buffers[0].action_buffer.append(action.to(torch.int32).item())
+                    buffers[0].log_prob_buffer.append(log_prob)
+                    for k in range(len(team_actions)):
+                        current_action[j][k] = team_actions[k]
+
+                    # Adversary Action
+                    action, log_prob = self.policies[1].get_action(new_obs[1][j])
+                    buffers[1].action_buffer.append(action.to(torch.int32).item())
+                    buffers[1].log_prob_buffer.append(log_prob)
+                    current_action[j][len(team_actions)] = action.to(torch.int32).item()
+
+                else:
+                    for k in range(len(self.policy_groups)): # sampling actions and log probs
+                        action, log_prob = self.policies[self.policy_groups[k]].get_action(new_obs[k][j])
+                        current_action[j][k] = action.to(torch.int32).item()
+                        buffers[k].action_buffer.append(current_action[j][k])
+                        buffers[k].log_prob_buffer.append(log_prob)
+
             self.env.step_async(current_action)
             obs, reward, done, _ = self.env.step_wait()
             next_obs = obs

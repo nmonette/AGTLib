@@ -4,6 +4,7 @@ from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import gymnasium as gym
+import multigrid
 import numpy as np
 from gymnasium import spaces
 

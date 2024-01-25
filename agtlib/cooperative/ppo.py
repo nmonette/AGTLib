@@ -14,6 +14,8 @@ from agtlib.utils.stable_baselines.vec_env.base_vec_env import VecEnv
 from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
 from agtlib.utils.stable_baselines.monitor import Monitor
 
+# [(i.j,k) for i in range(4) for j in range(4) for k in range(4)][0]
+
 class PPO(RLBase):
     """
     Base Implementation of Proximal Policy Optimization. Inspired by the OpenAI stable baselines 
@@ -674,6 +676,7 @@ class IPPO:
         
         policies = []
         values = []
+        rewards = []
         for ppo in self.ppo:
             policies.append(ppo.policy)
             values.append(ppo.value)
@@ -687,6 +690,8 @@ class IPPO:
 
             for i in range(len(self.ppo)): # do we want to parallelize this... can we even do that?
                 self.ppo[i].train(buffers[i], n_epochs, batch_size)
+
+        
 
         ## TODO: write monitor class so that the code below actually works
 
@@ -706,6 +711,155 @@ class IPPO:
         # for i in range(len(self.ppo)):
         #     print(i, ': ', mean_rewards[i])
     
+class advPPO:
+    """
+    Fully centralized Multi-Agent PPO playing against an adversary playing PPO.
+    """
+    def __init__(self, action_size: int, obs_size: int, n_agents: int, *, v_obs_size: int = None, policy_hl_dims: Iterable[int, ] = [64,128], \
+                 value_hl_dims: Iterable[int, ] = [64, 128], linear_value: bool = False, gamma: float = 0.99, \
+                    gae_lambda: float = 0.95, clip_range: float = 0.2, clip_range_vf: float = 0.2,
+                    vf_coef: float = 0.5, ent_coef: float = 0.0, target_kl: float = None, normalize_advantage: bool = True, 
+                    verbose: int = 0, max_grad_norm: float = 0.5):
+        '''
+        Initialize PPO parameters.
+        Parameters
+        -------
+        action_size: int
+            The cardinality of the action space of a single agent.
+        obs_size: int
+            The length of the flattened observation a single agent. 
+        n_agents: int
+            The number of agents in the environment. 
+        v_obs_size: int, optional, keyword only
+            The length of the flattened observation size of the agent(s).
+            Only specify if different from policy `obs_size` (e.g. the 
+            policy network uses locallized observations, but the value 
+            network uses the joint observation of multiple agents).
+        policy_hl_dims: Iterable(int), optional, keyword only
+            An iterable such that the ith element represents 
+            the width of the ith hidden layer
+            of the policy network. Defaults to `[64,128]`.
+            Note that this does not include the 
+            input or output layers.
+        value_hl_dims: Iterable(int), optional, keyword only
+            An iterable such that the ith element represents the 
+            width of the ith hidden layer of the value network. 
+            Defaults to `[64,128]`. Note that this does not include 
+            the input or output layers. Must be length 1 if linear_value 
+            is enabled, with the value equal to the number 
+            of linear features.
+        linear_value: bool, optional, keyword only
+            Indicates whether or not the value function is to be 
+            approximated linearly. Defaults to `False`.
+        gamma: float, optional, keyword only
+            The dicount factor. Defaults to `0.99`.
+        gae_lambda: float, optional, keyword only
+            Factor for trade-off of bias vs variance for Generalized Advantage Estimator
+            Defaults to `0.95`.
+        clip_range: float, optional, keyword only
+            The clip range of the ratio for the policy Defaults to `0.2`,
+            meaning the value is restricted to 1.2 and 0.8.
+        clip_range_vf: float, optional, keyword only
+            The clip range for the value function. Defaults to `0.2`, 
+            meaning the value is restricted to 1.2 and 0.8.
+        vf_coef: float, optional, keyword only
+            Coefficient for the Value function in the calculation of loss.
+            Defaults to `0.5`.__async_iterable 
+        ent_coef: float, optional, keyword only
+            Coefficient for the entropy in the calculation of loss. 
+            Defaults to `0.0`.
+        target_kl: float, optional, keyword only
+            KL divergence between old and new policies
+            that stops training when reached.
+            Defaults to `None`. 
+        normalize_advantage: bool, optional, keyword only
+            Boolean for determining whether to normalize the advantage. 
+            Defaults to `True`.
+        max_grad_norm: float, optional, keyword
+            Maximum value for the clipping of the gradient. Defaults to `0.5`.
+        '''
+        self.gamma = gamma
+        self.gae_lambda = gae_lambda
+        self.n_agents = n_agents
+        
+        self.team_action_map = [(i,j) for i in range(action_size) for j in range(action_size)] # dim 2 for multigrid
+        self.team_ppo = PPO(action_size**(n_agents-1), obs_size, 
+                        v_obs_size=v_obs_size, 
+                        policy_hl_dims=policy_hl_dims,
+                        value_hl_dims=value_hl_dims,
+                        linear_value=linear_value,
+                        gamma=gamma, 
+                        gae_lambda=gae_lambda,
+                        clip_range=clip_range,
+                        clip_range_vf=clip_range_vf,
+                        vf_coef=vf_coef,
+                        ent_coef=ent_coef,
+                        target_kl=target_kl,
+                        normalize_advantage=normalize_advantage,
+                        verbose=verbose,
+                        max_grad_norm=max_grad_norm) 
+        self.adv_ppo = PPO(action_size, obs_size, 
+                        v_obs_size=v_obs_size, 
+                        policy_hl_dims=policy_hl_dims,
+                        value_hl_dims=value_hl_dims,
+                        linear_value=linear_value,
+                        gamma=gamma, 
+                        gae_lambda=gae_lambda,
+                        clip_range=clip_range,
+                        clip_range_vf=clip_range_vf,
+                        vf_coef=vf_coef,
+                        ent_coef=ent_coef,
+                        target_kl=target_kl,
+                        normalize_advantage=normalize_advantage,
+                        verbose=verbose,
+                        max_grad_norm=max_grad_norm) 
+        
+        self.episode_avg_adv_rewards = []
+        self.episode_avg_team_rewards = []
+        
+    def get_utility(self, env, n_episodes):
+        rewards = []
+
+        env = env()
+
+        for episode in range(n_episodes):
+            while True:
+                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                action = {}
+                
+                for i in range(self.team_size):
+                    action[i] = team_action[i]
+                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
+                obs, reward, done, trunc, _ = self.env.step(action) 
+                
+                rewards.append(reward[0])
+
+                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    break # >= 2 comes from 2 terminal states in treasure hunt
+
+        return -torch.mean(torch.tensor(rewards).float()).item(), torch.mean(torch.tensor(rewards).float()).item()
+
+    def step(self, make_env: Callable[[None], gym.Env], *, n_envs: int = 1, rollout_length: int = 100, batch_size: int = 32, n_epochs: int = 10, n_updates: int = 1000):
+        rewards = []
+        policies = [self.team_ppo.policy, self.adv_ppo.policy]
+        values = [self.team_ppo.value, self.adv_ppo.value]
+        env = SubprocVecEnv([make_env for _ in range(n_envs)])
+        next_obs = env.reset()
+
+        rm = RolloutManager(rollout_length, env, policies, values, "advPPO", gamma=self.gamma, gae_lambda=self.gae_lambda, n_envs=n_envs)
+
+        for i in range(rollout_length):
+            buffers, next_obs = rm.rollout(next_obs, self.team_action_map)
+            self.adv_ppo.train(buffers[1], 100)
+
+        buffers, next_obs = rm.rollout(next_obs, self.team_action_map)
+        self.team_ppo.train(buffers[0], 100)
+
+        adv_utility, team_utility = self.get_utility(make_env, rollout_length)
+        self.episode_avg_adv_rewards.append(adv_utility)
+        self.episode_avg_team_rewards.append(team_utility) 
+
+        
                 
 
 

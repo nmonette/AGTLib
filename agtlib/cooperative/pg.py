@@ -1,8 +1,24 @@
+from concurrent.futures import ProcessPoolExecutor
+
 import torch
 import torch.nn as nn
 import numpy as np
+import ray
 
 from .base import RLBase, PolicyNetwork
+from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
+import multigrid
+from gymnasium import register
+
+CONFIGURATIONS = {
+        'MultiGrid-Empty-8x8-Team': (TeamEmptyEnv, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":20}),
+        'MultiGrid-Empty-6x6-Team': (TeamEmptyEnv, {'size': 8, "agents": 3, "allow_agent_overlap":True, "max_steps":60}),
+        'MultiGrid-Empty-4x4-Team': (TeamEmptyEnv, {'size': 6, "agents": 3, "allow_agent_overlap":True, "max_steps":40}),
+        'MultiGrid-Empty-3x3-Team': (TeamEmptyEnv, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":20})
+    }
+
+for name, (env_cls, config) in CONFIGURATIONS.items():
+    register(id=name, entry_point=env_cls, kwargs=config)
 
 class SoftmaxPolicy(nn.Module):
     def __init__(self, n_agents, n_actions, param_dims, lr= 0.01):
@@ -27,8 +43,7 @@ class SoftmaxPolicy(nn.Module):
         log_prob = dist.log_prob(action)
         return action, log_prob
     
-    def step(self, utility):
-        loss = -utility
+    def step(self, loss):
         loss.backward(inputs=(self.params,)) # inputs=(self.params,)
 
         x = self.params - self.lr * self.params.grad
@@ -42,7 +57,7 @@ class GDmax:
         self.obs_size = obs_size
         self.action_size = action_size
         self.team_size = team_size
-        self.env = env
+        self.env = env()
 
         self.lr = lr
         self.gamma = gamma
@@ -57,41 +72,47 @@ class GDmax:
         self.adv_loss = []
         self.episode_avg_team_rewards = []
 
-    def rollout(self):
+    # @ray.remote(num_returns=1)
+    def rollout(self, adversary=True):
         """
-        Rollout to calculate the adversary's loss
+        Rollout to calculate loss
         """
-        adv_log_probs = []
-        adv_rewards = []
+        log_probs = []
+        rewards = []
 
+        env = self.env # ()
         for episode in range(self.n_rollouts):
-            obs, _ = self.env.reset()
+            obs, _ = env.reset()
             ep_log_probs = []
-            ep_adv_rewards = []
+            ep_rewards = []
             while True:
-                team_action, _ = self.team_policy.get_actions(obs[0])
+                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
                 action = {}
                 for i in range(self.team_size):
                     action[i] = team_action[i]
-                action[i+1], log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
-                obs, reward, done, trunc, _ = self.env.step(action) 
+                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
+                obs, reward, done, trunc, _ = env.step(action) 
 
-                ep_log_probs.append(log_prob)
-                ep_adv_rewards.append(reward[len(reward) - 1])
+                if adversary:
+                    ep_log_probs.append(adv_log_prob)
+                    ep_rewards.append(reward[len(reward) - 1])
+                else:
+                    ep_log_probs.append(torch.sum(team_log_prob))
+                    ep_rewards.append(reward[0])
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                     break # >= 2 comes from 2 terminal states in treasure hunt
             
-            adv_log_probs.append(ep_log_probs)
-            adv_rewards.append(ep_adv_rewards)
+            log_probs.append(ep_log_probs)
+            rewards.append(ep_rewards)
 
-            return adv_log_probs, adv_rewards
+        return self.calculate_loss(log_probs, rewards)
         
-    def get_utility(self, calc_avg=True):
+    def get_utility(self, calc_logs=True):
         """
         Finds utility with both strategies fixed, averaged across 
         """
-        for episode in range(self.num_steps):
+        for episode in range(self.n_rollouts):
             obs, _ = self.env.reset()
             log_prob_rewards = []
             rewards = []
@@ -105,21 +126,20 @@ class GDmax:
                 action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
                 obs, reward, done, trunc, _ = self.env.step(action) 
                 
-                if calc_avg:
+                if calc_logs:
                     log_prob_rewards.append(reward[0] * (adv_log_prob.detach() + torch.sum(team_log_prob)))
                 rewards.append(reward[0])
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                     break # >= 2 comes from 2 terminal states in treasure hunt
-            self.episode_avg_adv_rewards.append(-torch.mean(torch.tensor(rewards)).item())
-            self.episode_avg_team_rewards.append(torch.mean(torch.tensor(rewards)).item())
-            if calc_avg:
+
+            if calc_logs:
                 # avg_utility = torch.mean(torch.tensor(log_rewards), requires_grad = True)
                 avg_utility = sum(log_prob_rewards) / len(log_prob_rewards)
                 # expected_utility = self.team_policy.params.flatten().T @ self.reward_table.flatten().float()
                 return avg_utility
             else:
-                return rewards
+                return -torch.mean(torch.tensor(rewards).float()).item(), torch.mean(torch.tensor(rewards).float()).item()
         
             
 
@@ -129,28 +149,48 @@ class GDmax:
         right = []
         for i in range(len(rewards)):
             gamma = 1
-            disc_reward = 0
-            log_prob = 0
-            for j in range(len(rewards[i])):
+            disc_reward = 0 
+            log_prob = sum(log_probs[i])
+            for j in range(len(rewards[i])): # we may need to do this sum with torch to allow for backpropagtion?
                 disc_reward += gamma * rewards[i][j] 
-                log_prob += log_probs[i][j]
                 gamma *= self.gamma
 
             left.append(disc_reward)
             right.append(log_prob)
 
         disc_reward = torch.tensor(left)
-        log_probs = torch.tensor(right, requires_grad=True)
+        log_probs = torch.stack(right)
 
-        return torch.mean(disc_reward * log_probs)
+        return -torch.mean(disc_reward * log_probs)
 
     def step(self):
-        for _ in range(self.num_steps):
-            adv_log_probs, adv_rewards = self.rollout()
-            adv_loss = self.calculate_loss(adv_log_probs, adv_rewards)
+        for _ in range(self.n_rollouts): # self.num_steps
+            # NON REMOTE: (WORKING)
+            # adv_log_probs, adv_rewards = self.rollout()
+            # adv_loss = self.calculate_loss(adv_log_probs, adv_rewards)
+
+            # REMOTE: (NOT WORKING)
+            # adv_loss = []
+            # for i in range(32):
+            #    adv_loss.append(self.rollout.remote(self))
+            
+            # adv_loss = ray.get(adv_loss)
+            # total_loss = torch.mean(torch.stack(adv_loss))
+
+            total_loss = self.rollout()
 
             self.adv_optimizer.zero_grad()
-            adv_loss.backward()
+            # adv_loss.backward()
+            total_loss.backward()
             self.adv_optimizer.step()
+
+        # team_log_probs, team_rewards = self.rollout(adversary=False)
+        # team_loss = self.calculate_loss(team_log_probs, team_rewards)
+            
+        team_loss = self.rollout(adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
         
-        self.team_policy.step(self.get_utility())
+        self.team_policy.step(team_loss)
+        adv_utility, team_utility = self.get_utility(calc_logs=False)
+
+        self.episode_avg_adv_rewards.append(adv_utility)
+        self.episode_avg_team_rewards.append(team_utility)

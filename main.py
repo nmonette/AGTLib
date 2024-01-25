@@ -25,27 +25,30 @@ from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
 import multigrid
 
 if __name__ == "__main__":
-    env_dict = gym.envs.registration.registry.copy()
+    # env_dict = gym.envs.registration.registry.copy()
 
-    # for env in env_dict:
-    #     if 'MultiGrid-Empty-8x8-Team' in env:
-    #         print("Remove {} from registry".format(env))
-    #         del gym.envs.registration.registry[env]
+    # # for env in env_dict:
+    # #     if 'MultiGrid-Empty-8x8-Team' in env:
+    # #         print("Remove {} from registry".format(env))
+    # #         del gym.envs.registration.registry[env]
     
-    CONFIGURATIONS = {
-            'MultiGrid-Empty-6x6-Team': (TeamEmptyEnv, {'size': 8, "agents": 3, "allow_agent_overlap":True, "max_steps":3000}),
-            'MultiGrid-Empty-4x4-Team': (TeamEmptyEnv, {'size': 6, "agents": 3, "allow_agent_overlap":True, "max_steps":3000}),
-            'MultiGrid-Empty-3x3-Team': (TeamEmptyEnv, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":3000})
-        }
+    # CONFIGURATIONS = {
+    #         'MultiGrid-Empty-8x8-Team': (TeamEmptyEnv, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":20}),
+    #         'MultiGrid-Empty-6x6-Team': (TeamEmptyEnv, {'size': 8, "agents": 3, "allow_agent_overlap":True, "max_steps":60}),
+    #         'MultiGrid-Empty-4x4-Team': (TeamEmptyEnv, {'size': 6, "agents": 3, "allow_agent_overlap":True, "max_steps":40}),
+    #         'MultiGrid-Empty-3x3-Team': (TeamEmptyEnv, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":20})
+    #     }
     
-    for name, (env_cls, config) in CONFIGURATIONS.items():
-        register(id=name, entry_point=env_cls, kwargs=config)
+    # for name, (env_cls, config) in CONFIGURATIONS.items():
+    #     register(id=name, entry_point=env_cls, kwargs=config)
 
+    # gym.make("MultiGrid-Empty-8x8-Team", render_mode="human")
+
+    # MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     
-    # generate_reward(3, 3)
-    test_gdmax(MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)))
-    
-    # ippo = IPPO(4, 22, 3)
+    grid_experiment_3x3(MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)))
+    # SubprocVecEnv([lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))])
+    # ippo = IPPO(4, 15, 3)
     # ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", agents=3)), n_envs = 32, n_updates=1000, rollout_length=100)
    
     # policies = []
@@ -76,4 +79,4 @@ if __name__ == "__main__":
     # test_gd()
     print("end")
     
-    # pdoc --docformat numpy agtlib
+ 
