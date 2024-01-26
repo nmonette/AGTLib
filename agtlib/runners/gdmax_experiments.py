@@ -1,23 +1,21 @@
 from time import sleep, time
 
 import gymnasium as gym
-import torch
 import matplotlib.pyplot as plt
-import ray
+import torch
 
-from ..cooperative.pg import GDmax, SoftmaxPolicy
 from ..cooperative.base import PolicyNetwork
-from ..cooperative.ppo import advPPO
+from ..cooperative.pg import GDmax, SoftmaxPolicy
 from ..utils.env import MultiGridWrapper
 
-ray.init()
+# ray.init()
 
 def grid_experiment_3x3(env1):
     dim = 3
     
     gdm = GDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 2, 4], n_rollouts=50)
 
-    for i in range(1000):
+    for i in range(10):
         x = time()
         gdm.step()
         print(f"iteration {i} done in {time() - x}s")
@@ -80,7 +78,7 @@ def grid_experiment_3x3(env1):
 
     
     env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
-    for episode in range(100):
+    for episode in range(0):
         obs, _ = env.reset()
         env.render()
         while True:
