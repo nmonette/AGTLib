@@ -5,8 +5,9 @@ import torch
 import matplotlib.pyplot as plt
 import ray
 
-from ..cooperative.pg import SoftmaxPolicy # , GDmax
-from ..cooperative.pg_parallel import GDmax as pgdm
+from ..cooperative.pg import SoftmaxPolicy 
+from ..cooperative.pg import GDmax as GDMax, NGDmax
+from ..cooperative.pg_parallel import GDmax as PGDMax
 from ..cooperative.base import PolicyNetwork
 from ..cooperative.ppo import advPPO
 from ..utils.env import MultiGridWrapper
@@ -16,42 +17,42 @@ from ..utils.env import MultiGridWrapper
 def grid_experiment_3x3(env1):
     dim = 3
     
-    gdm = pgdm(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
+    # gdm = PGDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
+    # gdm = GDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50)
+    # gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50)
+    # for i in range(1000):
+    #     x = time()
+    #     gdm.step()
+    #     print(f"iteration {i} done in {time() - x}s")
 
-    for i in range(1000):
-        x = time()
-        gdm.step()
-        print(f"iteration {i} done in {time() - x}s")
+    # team = gdm.team_policy
+    # torch.save(team.state_dict(), f"{dim}x{dim}-team-policy.pt")
+    # adv = gdm.adv_policy
+    # torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy.pt")
 
-    team = gdm.team_policy
-    torch.save(team.state_dict(), f"{dim}x{dim}-team-policy.pt")
-    adv = gdm.adv_policy
-    torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy.pt")
+    # fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    # fig.suptitle("GDMax with Adversarial TMG")
+    # ax1.set_title("Adversary Mean Episode Rewards")
+    # ax1.set_xlabel("Iterations")
+    # ax1.set_ylabel("Mean Reward")
+    # ax1.plot(gdm.episode_avg_adv_rewards)
+    # ax2.set_title("Team Mean Episode Rewards")
+    # ax2.set_xlabel("Iterations")
+    # ax2.set_ylabel("Mean Reward")
+    # ax2.plot(gdm.episode_avg_team_rewards)
 
-    fig.suptitle("GDMax with Adversarial TMG")
-    ax1.set_title("Adversary Mean Episode Rewards")
-    ax1.set_xlabel("Iterations")
-    ax1.set_ylabel("Mean Reward")
-    ax1.plot(gdm.episode_avg_adv_rewards)
-    ax2.set_title("Team Mean Episode Rewards")
-    ax2.set_xlabel("Iterations")
-    ax2.set_ylabel("Mean Reward")
-    ax2.plot(gdm.episode_avg_team_rewards)
-
-    fig.savefig("gdmax_experiment_rewards.png")
+    # fig.savefig("gdmax_experiment_rewards.png")
     
-
     """
     ppo = advPPO(4, 15, 3)
     
     def make_env():
-        return MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", agents=3, size=5))
+        return MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12))
 
     for i in range(10):
         x = time()
-        ppo.step(make_env, n_envs=32)
+        ppo.step(make_env, n_envs=4)
         print(f"iteration {i} done in {time() - x}s")
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
@@ -68,16 +69,13 @@ def grid_experiment_3x3(env1):
 
     team = ppo.team_ppo.policy
     adv = ppo.adv_ppo.policy
-
+    
     """
-    
-    
     team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 2, 4])
     adv = PolicyNetwork(15, 4)
 
     team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy.pt"))
     adv.load_state_dict(torch.load(f"{dim}x{dim}-adv-policy.pt"))
-    
 
     
     env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))

@@ -823,13 +823,15 @@ class advPPO:
         env = env()
 
         for episode in range(n_episodes):
+            obs, _ = env.reset()
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                team_action, team_log_prob = self.team_ppo.policy.get_action(torch.tensor(obs[0]).float())
+                team_action = self.team_action_map[team_action]
                 action = {}
                 
                 for i in range(self.team_size):
                     action[i] = team_action[i]
-                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
+                action[i+1], adv_log_prob = self.adv_ppo.policy.get_action(torch.tensor(obs[0]).float())
                 obs, reward, done, trunc, _ = self.env.step(action) 
                 
                 rewards.append(reward[0])

@@ -1,9 +1,8 @@
-from concurrent.futures import ProcessPoolExecutor
+from typing import Iterable
 
 import torch
 import torch.nn as nn
 import numpy as np
-import ray
 
 from .base import RLBase, PolicyNetwork
 from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
@@ -40,7 +39,67 @@ class SoftmaxPolicy(nn.Module):
         self.params.grad.zero_()
         self.params.data = nn.Softmax()(x)
 
+class MAPolicyNetwork(nn.Module):
+    def __init__(self, obs_size: int, action_size: int, action_map: [[int, ]], hl_dims: Iterable[int, ] = [64, 128]) -> None:
+        """
+        Parameters
+        ----------
+        obs_size: int
+            The length of the flattened observation of the agent(s). 
+        action_size: int
+            The cardinality of the action space of a single agent. 
+        hl_dims: Iterable(int), optional
+            An iterable such that the ith element represents the width of the ith hidden layer. 
+            Defaults to `[64,128]`. Note that this does not include the input or output layers.
+        """
+        super(MAPolicyNetwork, self).__init__()
+        prev_dim = obs_size 
+        hl_dims.append(action_size)
+        self.layers = nn.ModuleList()
+        for i in range(len(hl_dims)):
+            self.layers.append(nn.Linear(prev_dim, hl_dims[i]))
+            prev_dim = hl_dims[i]
 
+        self.action_map = action_map
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Performs the forward pass of the neural network.
+        Parameters
+        ----------
+        x: torch.Tensor
+            The flattened observation of the agent(s).
+
+        Returns
+        -------
+        torch.Tensor
+            Probability vector containing the action-probabilities.
+        """
+        if isinstance(x, np.ndarray):
+            x = torch.tensor(x, dtype=torch.float)
+        for i in range(len(self.layers) - 1):
+            x = torch.nn.ReLU()(self.layers[i](x))
+        return self.layers[-1](x)
+
+    def get_actions(self, x: torch.Tensor) -> int:
+        """
+        Samples an action from the current policy and returns it as an integer index.
+        Parameters
+        ----------
+        x: torch.Tensor
+            The flattened observation of the agent(s).
+        Returns
+        -------
+        int
+            The integer index of the action samples from the policy.
+        float
+            The log probability of the returned action with reference to the current policy.
+        """
+
+        dist = torch.distributions.Categorical(logits=self.forward(x))
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        return self.action_map[action], log_prob
         
 class GDmax:
     def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], team_size: int = 2, lr: float = 0.01, gamma:float = 0.9, n_rollouts:int = 100):
@@ -62,7 +121,6 @@ class GDmax:
         self.adv_loss = []
         self.episode_avg_team_rewards = []
 
-    # @ray.remote(num_returns=1)
     def rollout(self, adversary=True):
         """
         Rollout to calculate loss
@@ -154,16 +212,12 @@ class GDmax:
         return -torch.mean(disc_reward * log_probs)
 
     def step(self):
-        for _ in range(self.n_rollouts): # self.num_steps
+        for _ in range(self.n_rollouts * 2): # self.num_steps
             total_loss = self.rollout()
 
             self.adv_optimizer.zero_grad()
-            # adv_loss.backward()
             total_loss.backward()
             self.adv_optimizer.step()
-
-        # team_log_probs, team_rewards = self.rollout(adversary=False)
-        # team_loss = self.calculate_loss(team_log_probs, team_rewards)
             
         team_loss = self.rollout(adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
         
@@ -172,3 +226,38 @@ class GDmax:
 
         self.episode_avg_adv_rewards.append(adv_utility)
         self.episode_avg_team_rewards.append(team_utility)
+
+class NGDmax(GDmax):
+    """
+    Neural GDMax, i.e. the team plays
+    with a neural network instead of 
+    direct parameteriation.
+    """
+    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], team_size: int = 2, lr: float = 0.01, gamma:float = 0.9, n_rollouts:int = 100):
+        super().__init__(obs_size, action_size, env, param_dims, hl_dims, team_size, lr, gamma, n_rollouts)
+        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
+        self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr)
+
+    def step(self):
+        for _ in range(self.n_rollouts * 2): # self.num_steps
+            adv_loss = self.rollout()
+
+            self.adv_optimizer.zero_grad()
+            adv_loss.backward()
+            self.adv_optimizer.step()
+            
+        team_loss = self.rollout(adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
+        
+        self.team_optimizer.zero_grad()
+        team_loss.backward()
+        self.team_optimizer.step()
+        adv_utility, team_utility = self.get_utility(calc_logs=False)
+
+        self.episode_avg_adv_rewards.append(adv_utility)
+        self.episode_avg_team_rewards.append(team_utility)
+
+class LGDmax:
+    """
+    GDMax optimization algorithm
+    that is working on 
+    """

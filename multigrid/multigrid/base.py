@@ -428,12 +428,9 @@ class MultiGridEnv(gym.Env, RandomMixin, ABC):
                     if fwd_obj is not None:
                         if fwd_obj.type == Type.goal:
                             self.on_success(agent, rewards, {})
-                        # else:
-                        #     rewards[i] = self._reward(False, agent)
+
                         if fwd_obj.type == Type.lava:
                             self.on_failure(agent, rewards, {})
-                    # else:
-                    #     rewards[i] = self._reward(False, agent)
 
             # Pick up an object
             elif action == Action.pickup:
@@ -595,17 +592,12 @@ class MultiGridEnv(gym.Env, RandomMixin, ABC):
 
         return output
 
-    def _reward(self, success = False, agent = None) -> float:
+    def _reward(self) -> float:
         """
         Compute the reward to be given upon success.
         """
-        # issue with the euclidean distance is that it isn't central to the team.
-        if agent is None:
-            return 1 - 0.9 * (self.step_count / self.max_steps)
-        else:
-            dist_1 = np.linalg.norm(np.array(self.goal1) - np.array(agent.pos))
-            dist_2 = np.linalg.norm(np.array(self.goal2) - np.array(agent.pos))
-            return 1 / min(dist_1, dist_2)
+        return 1 - 0.9 * (self.step_count / self.max_steps)
+        
 
     def place_obj(
         self,
@@ -984,21 +976,8 @@ class TeamMultiGridEnv(MultiGridEnv):
                 if fwd_obj is not None:
                     if fwd_obj.type == Type.goal:
                         self.on_success(agent, rewards, {})
-                    else:
-                        self._reward(agent)
                     if fwd_obj.type == Type.lava:
                         self.on_failure(agent, rewards, {})
-                else:
-                    self._reward(agent)
-
-        max_reward = 0
-        for i in rewards:
-            if i < self.num_agents - (self.num_agents // 2) and rewards[i] > max_reward:
-                max_reward = rewards[i]
-            elif i < self.num_agents - (self.num_agents // 2):
-                rewards[i] = max_reward
-            else:
-                continue
             
         return rewards
 
@@ -1030,11 +1009,11 @@ class TeamMultiGridEnv(MultiGridEnv):
         
         teams = [team1, team2]
 
-        reward = self._reward(agent)
+        reward = self._reward()
         for i in teams[winner]:
-            rewards[i] = reward
+            rewards[i]+= reward
         for i in teams[winner^1]:
-            rewards[i] = -reward
+            rewards[i]+= -reward
 
         self.goals -= 1
         if self.goals == 0:
