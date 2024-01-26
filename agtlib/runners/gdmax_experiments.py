@@ -5,17 +5,18 @@ import torch
 import matplotlib.pyplot as plt
 import ray
 
-from ..cooperative.pg import GDmax, SoftmaxPolicy
+from ..cooperative.pg import SoftmaxPolicy # , GDmax
+from ..cooperative.pg_parallel import GDmax as pgdm
 from ..cooperative.base import PolicyNetwork
 from ..cooperative.ppo import advPPO
 from ..utils.env import MultiGridWrapper
 
-ray.init()
+# ray.init()
 
 def grid_experiment_3x3(env1):
     dim = 3
     
-    gdm = GDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 2, 4], n_rollouts=50)
+    gdm = pgdm(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
 
     for i in range(1000):
         x = time()

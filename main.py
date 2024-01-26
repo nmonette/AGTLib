@@ -24,6 +24,9 @@ from agtlib.utils.stable_baselines.monitor import Monitor
 from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
 import multigrid
 
+import warnings
+warnings.filterwarnings("ignore")
+
 if __name__ == "__main__":
     # env_dict = gym.envs.registration.registry.copy()
 

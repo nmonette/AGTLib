@@ -93,6 +93,41 @@ class RolloutBuffer:
             yield self[perm[idx:idx + batch_size]]
             idx += batch_size
 
+class MCBuffer:
+    """
+    Rollout Buffer for usage with Monte Carlo 
+    simulations. Because the code uses the 
+    vectorized environment, the `n_rollouts`
+    parameter limits the number of episodes 
+    the buffer stores per environment.
+    """
+    def __init__(self, n_rollouts, n_envs, index):
+        self.rewards = []
+        self.log_probs = []
+
+        self.current_rewards = [[] for _ in range(n_envs)]
+        self.current_log_probs = [[] for _ in range(n_envs)]
+        
+        self.n_envs = n_envs
+        self.n_rollouts = n_rollouts
+
+        self.index = index
+
+    def add(self, rewards, log_probs, dones):
+        for i in range(self.n_envs):
+            self.current_rewards[i].append(rewards[i][self.index])
+            self.current_log_probs[i].append(log_probs[i])
+            if dones[i]:
+                self.rewards.append(self.current_rewards[i])
+                self.log_probs.append(self.current_log_probs[i])
+
+                self.current_rewards[i] = []
+                self.current_log_probs[i] = []
+
+        return len(self.rewards) == self.n_rollouts * self.n_envs
+
+    def get_data(self):
+        return self.log_probs, self.rewards
 
 class RolloutManager:
     """
@@ -281,11 +316,6 @@ class RolloutManager:
 
         return buffers, next_obs
 
-class MCBuffer:
-    def __init__(self, rollout_length, num_agents):
-        self.log_probs = {i : [] for i in range(len(num_agents))}
-        self.rewards = {i : [] for i in range(len(num_agents))}
-
 class MCRollout:
     """
     Monte Carlo Rollouts for GDMax
@@ -325,4 +355,3 @@ class MCRollout:
 
             # Team Actions
             team_actions = self.policies[0].get_actions(torch.tensor(obs))
-            

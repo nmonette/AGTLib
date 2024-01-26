@@ -51,6 +51,10 @@ CONFIGURATIONS = {
     'MultiGrid-RedBlueDoors-6x6-v0': (RedBlueDoorsEnv, {'size': 6}),
     'MultiGrid-RedBlueDoors-8x8-v0': (RedBlueDoorsEnv, {'size': 8}),
     'MultiGrid-Empty-8x8-Team': (TeamEmptyEnv, {'size': 8, "agents": 4}),
+    'MultiGrid-Empty-6x6-Team': (TeamEmptyEnv, {'size': 8, "agents": 3, "allow_agent_overlap":True, "max_steps":60}),
+    'MultiGrid-Empty-5x5-Team': (TeamEmptyEnv, {'size': 7, "agents": 3, "allow_agent_overlap":True, "max_steps":50}),
+    'MultiGrid-Empty-4x4-Team': (TeamEmptyEnv, {'size': 6, "agents": 3, "allow_agent_overlap":True, "max_steps":40}),
+    'MultiGrid-Empty-3x3-Team': (TeamEmptyEnv, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":12})
 }
 
 # Register environments with gymnasium
