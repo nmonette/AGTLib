@@ -53,7 +53,7 @@ class SoftmaxPolicy(nn.Module):
 
         
 class GDmax:
-    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], team_size: int = 2, lr: float = 0.01, gamma:float = 0.99, n_rollouts:int = 100):
+    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], team_size: int = 2, lr: float = 0.01, gamma:float = 0.9, n_rollouts:int = 100):
         self.obs_size = obs_size
         self.action_size = action_size
         self.team_size = team_size
