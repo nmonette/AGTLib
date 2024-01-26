@@ -259,7 +259,6 @@ class RolloutManager:
                     buffers[1].action_buffer.append(action.to(torch.int32).item())
                     buffers[1].log_prob_buffer.append(log_prob)
                     current_action[j][len(team_actions)] = action.to(torch.int32).item()
-
                 else:
                     for k in range(len(self.policy_groups)): # sampling actions and log probs
                         action, log_prob = self.policies[self.policy_groups[k]].get_action(new_obs[k][j])
@@ -282,4 +281,48 @@ class RolloutManager:
 
         return buffers, next_obs
 
+class MCBuffer:
+    def __init__(self, rollout_length, num_agents):
+        self.log_probs = {i : [] for i in range(len(num_agents))}
+        self.rewards = {i : [] for i in range(len(num_agents))}
 
+class MCRollout:
+    """
+    Monte Carlo Rollouts for GDMax
+    """
+    def __init__(self, rollout_length: int, env: gym.Env, policies: Iterable[PolicyNetwork, ], values: Iterable[ Union[ValueNetwork, LinearValue], ], model_name: str, policy_groups: Iterable[PolicyNetwork, ] = None, value_groups: Iterable[PolicyNetwork, ] = None, gamma: float = 0.99, gae_lambda: float = 0.95, n_envs: int = 1):
+        self.rollout_length = rollout_length
+        self.env = env
+
+        self.policies = policies
+        if policy_groups is None:
+            self.policy_groups = list(range(len(policies)))
+        else:
+            self.policy_groups = policy_groups
+
+        self.values = values
+        if value_groups is None:
+            self.value_groups = list(range(len(values)))
+        else:
+            self.value_groups = value_groups
+
+        self.gamma = gamma
+        self.gae_lambda = gae_lambda    
+        self.n_envs = n_envs    
+
+        self.model_name = model_name
+
+        self.buffers = [RolloutBuffer(self.rollout_length) for _ in range(len(self.policy_groups))]
+
+    def rollout(self):
+        
+        lengths = np.zeros((len(self.env)))
+
+        obs = self.env.reset()
+
+        for i in range(self.rollout_length):
+            current_action = []
+
+            # Team Actions
+            team_actions = self.policies[0].get_actions(torch.tensor(obs))
+            
