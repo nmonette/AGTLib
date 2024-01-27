@@ -58,7 +58,8 @@ class MultiGridWrapper(gym.Wrapper):
         obs, reward, done, trunc, _ = self.env.step(action)
         for i in obs:
             obs[i] = np.concatenate([np.array(j).flatten() for j in obs[i].values()])
-
+        if isinstance(trunc, bool):
+            trunc = {i: trunc for i in range(len(obs))}
         return obs, reward, done, trunc, _
     
     def render(self):

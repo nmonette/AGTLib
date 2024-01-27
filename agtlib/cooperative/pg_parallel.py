@@ -58,6 +58,8 @@ class GDmax:
         self.gamma = gamma
         self.n_rollouts = n_rollouts
         self.num_steps = n_rollouts * 10
+
+        self.rollout_env = SubprocVecEnv([self.env for _ in range(5)])
         
         self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr)
@@ -67,16 +69,14 @@ class GDmax:
         self.adv_loss = []
         self.episode_avg_team_rewards = []
 
-    def rollout(self, adversary=True, n_envs = 1):
+    def rollout(self, env, adversary=True, n_envs = 1):
         """
         Rollout to calculate loss
         """
         complete = False
         buffer = MCBuffer(self.n_rollouts, n_envs, 2 if adversary else 0)
-
-        env = SubprocVecEnv([self.env for _ in range(n_envs)])  # ()
+        obs = env.reset()
         while not complete:
-            obs = env.reset()
             team_obs = torch.from_numpy(obs[0]).int()
             adv_obs = torch.from_numpy(obs[len(obs)-1]).float()
 
@@ -158,19 +158,16 @@ class GDmax:
         return -torch.mean(x * y)
 
     def step(self):
+        rollout_envs = self.rollout_env
         for _ in range(100): # self.num_steps
-            total_loss = self.rollout(n_envs=5)
+            total_loss = self.rollout(rollout_envs, n_envs = 5)
 
             self.adv_optimizer.zero_grad()
             # adv_loss.backward()
             total_loss.backward()
             self.adv_optimizer.step()
 
-
-        # team_log_probs, team_rewards = self.rollout(adversary=False)
-        # team_loss = self.calculate_loss(team_log_probs, team_rewards)
-            
-        team_loss = self.rollout(adversary=False, n_envs=5) # ray.get(self.rollout.remote(self, adversary=False))
+        team_loss = self.rollout(rollout_envs, adversary=False, n_envs=5) # ray.get(self.rollout.remote(self, adversary=False))
         self.team_policy.step(team_loss)
         adv_utility, team_utility = self.get_utility(calc_logs=False)
 

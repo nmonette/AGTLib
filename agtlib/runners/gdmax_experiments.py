@@ -17,32 +17,32 @@ from ..utils.env import MultiGridWrapper
 def grid_experiment_3x3(env1):
     dim = 3
     
-    # gdm = PGDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
+    gdm = PGDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
     # gdm = GDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50)
-    # gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50)
-    # for i in range(1000):
-    #     x = time()
-    #     gdm.step()
-    #     print(f"iteration {i} done in {time() - x}s")
+    # gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
+    for i in range(1000):
+        x = time()
+        gdm.step()
+        print(f"iteration {i} done in {time() - x}s")
 
-    # team = gdm.team_policy
-    # torch.save(team.state_dict(), f"{dim}x{dim}-team-policy.pt")
-    # adv = gdm.adv_policy
-    # torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy.pt")
+    team = gdm.team_policy
+    torch.save(team.state_dict(), f"{dim}x{dim}-team-policy.pt")
+    adv = gdm.adv_policy
+    torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy.pt")
 
-    # fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    # fig.suptitle("GDMax with Adversarial TMG")
-    # ax1.set_title("Adversary Mean Episode Rewards")
-    # ax1.set_xlabel("Iterations")
-    # ax1.set_ylabel("Mean Reward")
-    # ax1.plot(gdm.episode_avg_adv_rewards)
-    # ax2.set_title("Team Mean Episode Rewards")
-    # ax2.set_xlabel("Iterations")
-    # ax2.set_ylabel("Mean Reward")
-    # ax2.plot(gdm.episode_avg_team_rewards)
+    fig.suptitle("GDMax with Adversarial TMG")
+    ax1.set_title("Adversary Mean Episode Rewards")
+    ax1.set_xlabel("Iterations")
+    ax1.set_ylabel("Mean Reward")
+    ax1.plot(gdm.episode_avg_adv_rewards)
+    ax2.set_title("Team Mean Episode Rewards")
+    ax2.set_xlabel("Iterations")
+    ax2.set_ylabel("Mean Reward")
+    ax2.plot(gdm.episode_avg_team_rewards)
 
-    # fig.savefig("gdmax_experiment_rewards.png")
+    fig.savefig("gdmax_experiment_rewards.png")
     
     """
     ppo = advPPO(4, 15, 3)
@@ -78,7 +78,7 @@ def grid_experiment_3x3(env1):
     adv.load_state_dict(torch.load(f"{dim}x{dim}-adv-policy.pt"))
 
     
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     for episode in range(100):
         obs, _ = env.reset()
         env.render()

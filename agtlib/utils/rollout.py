@@ -1,4 +1,5 @@
 from typing import Iterable, List, Dict, DefaultDict, Union
+import time
 
 import torch
 import torch.nn as nn
@@ -123,8 +124,7 @@ class MCBuffer:
 
                 self.current_rewards[i] = []
                 self.current_log_probs[i] = []
-
-        return len(self.rewards) == self.n_rollouts * self.n_envs
+        return len(self.rewards) >= self.n_rollouts * self.n_envs
 
     def get_data(self):
         return self.log_probs, self.rewards

@@ -1062,6 +1062,9 @@ class TeamMultiGridEnv(MultiGridEnv):
         if self.render_mode == 'human':
             self.render()
 
+        if truncations == True:
+            print("weird")
+
         return observations, rewards, terminations, truncations, defaultdict(dict)
 
     def gen_obs(self) -> dict[AgentID, ObsType]:

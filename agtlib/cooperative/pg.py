@@ -140,7 +140,6 @@ class GDmax:
                     action[i] = team_action[i]
                 action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
                 obs, reward, done, trunc, _ = env.step(action) 
-
                 if adversary:
                     ep_log_probs.append(adv_log_prob)
                     ep_rewards.append(reward[len(reward) - 1])
