@@ -3,9 +3,8 @@ from time import sleep, time
 import gymnasium as gym
 import torch
 import matplotlib.pyplot as plt
-import ray
 
-from ..cooperative.pg import SoftmaxPolicy 
+from ..cooperative.pg import SoftmaxPolicy, MAPolicyNetwork
 from ..cooperative.pg import GDmax as GDMax, NGDmax
 from ..cooperative.pg_parallel import GDmax as PGDMax
 from ..cooperative.base import PolicyNetwork
@@ -17,10 +16,10 @@ from ..utils.env import MultiGridWrapper
 def grid_experiment_3x3(env1):
     dim = 3
     
-    gdm = PGDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
+    # gdm = PGDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
     # gdm = GDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50)
-    # gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
-    for i in range(1000):
+    gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
+    for i in range(100):
         x = time()
         gdm.step()
         print(f"iteration {i} done in {time() - x}s")
@@ -71,14 +70,14 @@ def grid_experiment_3x3(env1):
     adv = ppo.adv_ppo.policy
     
     """
-    team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 2, 4])
-    adv = PolicyNetwork(15, 4)
+    # team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) # SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 2, 4])
+    # adv = PolicyNetwork(15, 4)
 
-    team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy.pt"))
-    adv.load_state_dict(torch.load(f"{dim}x{dim}-adv-policy.pt"))
+    # team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy.pt"))
+    # adv.load_state_dict(torch.load(f"{dim}x{dim}-adv-policy.pt"))
 
     
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
     for episode in range(100):
         obs, _ = env.reset()
         env.render()
@@ -88,9 +87,8 @@ def grid_experiment_3x3(env1):
             # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action
-
             obs, reward, trunc, done, _ = env.step(action)
-            print(reward)
+            print(action, reward)
             sleep(0.5)
             if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                 break

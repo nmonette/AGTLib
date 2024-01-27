@@ -3,7 +3,6 @@ from concurrent.futures import ProcessPoolExecutor
 import torch
 import torch.nn as nn
 import numpy as np
-import ray
 
 from .base import RLBase, PolicyNetwork
 from ..utils.rollout import MCBuffer
@@ -157,17 +156,17 @@ class GDmax:
 
         return -torch.mean(x * y)
 
-    def step(self):
+    def step(self, n_envs):
         rollout_envs = self.rollout_env
         for _ in range(100): # self.num_steps
-            total_loss = self.rollout(rollout_envs, n_envs = 5)
+            total_loss = self.rollout(rollout_envs, n_envs)
 
             self.adv_optimizer.zero_grad()
             # adv_loss.backward()
             total_loss.backward()
             self.adv_optimizer.step()
 
-        team_loss = self.rollout(rollout_envs, adversary=False, n_envs=5) # ray.get(self.rollout.remote(self, adversary=False))
+        team_loss = self.rollout(rollout_envs, n_envs adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
         self.team_policy.step(team_loss)
         adv_utility, team_utility = self.get_utility(calc_logs=False)
 
