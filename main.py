@@ -10,7 +10,7 @@ from gymnasium import register
 import torch
 
 from tests.gd_test import test_gd
-from tests.gdmax_test import test_gdmax
+# from tests.gdmax_test import test_gdmax
 from agtlib.runners.gdmax_experiments import grid_experiment_3x3
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import PPO, IPPO
@@ -21,15 +21,16 @@ from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
 from agtlib.utils.stable_baselines.monitor import Monitor
 
 
-from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
-import multigrid
+from multigrid.envs.team_empty import TeamEmptyEnv
 
 import warnings
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
     # env_dict = gym.envs.registration.registry.copy()
-
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("CUDA available: " + str(torch.cuda.is_available()))
+    torch.set_default_device("cuda" if torch.cuda.is_available() else "cpu")
     # # for env in env_dict:
     # #     if 'MultiGrid-Empty-8x8-Team' in env:
     # #         print("Remove {} from registry".format(env))

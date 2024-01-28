@@ -5,8 +5,6 @@ import torch.nn as nn
 import numpy as np
 
 from .base import RLBase, PolicyNetwork
-from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
-import multigrid
 from gymnasium import register
 
 class SoftmaxPolicy(nn.Module):
@@ -18,18 +16,27 @@ class SoftmaxPolicy(nn.Module):
         self.n_actions = n_actions
         self.param_dims = param_dims
 
-        empty = torch.empty(*param_dims)
-        nn.init.orthogonal_(empty)
+        # empty = torch.empty(*param_dims)
+        # print(param_dims)
+        empty = torch.zeros(param_dims)
+        # print(empty)
+        # nn.init.orthogonal_(empty)
         self.params = nn.Parameter(nn.Softmax()(empty), requires_grad=True)
+        print("Running...")
         
 
     def forward(self, x):
-        return self.params[*x, :, :]
+        # return 0
+        # print(x)
+        ret = self.params[x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], x[13], x[14], :, :]
+        # print(ret.shape)
+        return ret
 
     def get_actions(self, x):
         dist = torch.distributions.Categorical(self.forward(x)) # make categorical distribution and then decode the action index
         action = dist.sample()
         log_prob = dist.log_prob(action)
+        # print(action[0])
         return action, log_prob
     
     def step(self, loss):

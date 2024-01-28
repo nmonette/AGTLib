@@ -1,6 +1,5 @@
 import gymnasium as gym
 import numpy as np
-import ray
 
 class SingleAgentEnvWrapper(gym.Wrapper):
     """
@@ -65,7 +64,6 @@ class MultiGridWrapper(gym.Wrapper):
     def render(self):
         self.env.render()
 
-@ray.remote
 class RayMultiGridWrapper(MultiGridWrapper):
     pass
     

@@ -3,12 +3,10 @@ from concurrent.futures import ProcessPoolExecutor
 import torch
 import torch.nn as nn
 import numpy as np
-import ray
 
 from .base import RLBase, PolicyNetwork
 from ..utils.rollout import MCBuffer
 from ..utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
-from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
 import multigrid
 from gymnasium import register
 
@@ -30,7 +28,8 @@ class SoftmaxPolicy(nn.Module):
         
 
     def forward(self, x):
-        return torch.stack([self.params[*x[i], :] for i in range(len(x))])
+        return 0
+        # return torch.stack([self.params[*x[i], :] for i in range(len(x))])
          
 
     def get_actions(self, x):
