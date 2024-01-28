@@ -166,7 +166,7 @@ class GDmax:
             total_loss.backward()
             self.adv_optimizer.step()
 
-        team_loss = self.rollout(rollout_envs, n_envs adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
+        team_loss = self.rollout(rollout_envs, n_envs, adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
         self.team_policy.step(team_loss)
         adv_utility, team_utility = self.get_utility(calc_logs=False)
 

@@ -1,30 +1,28 @@
 import multiprocessing as mp
+import warnings
 from random import randint
 from time import sleep
 
-import numpy as np
 # from agtlib.competitive.mwu import MultiplicativeWeights 
 import gymnasium as gym
+import numpy as np
+import torch
 from gymnasium import register
 
-import torch
-
+import multigrid
+from agtlib.cooperative.base import PolicyNetwork
+from agtlib.cooperative.ppo import IPPO, PPO
+from agtlib.runners.gdmax_experiments import grid_experiment_3x3
+from agtlib.utils.env import (MultiGridWrapper, SingleAgentEnvWrapper,
+                              generate_reward)
+from agtlib.utils.rollout import RolloutManager
+from agtlib.utils.stable_baselines.monitor import Monitor
+from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
+from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
 from tests.gd_test import test_gd
 from tests.gdmax_test import test_gdmax
-from agtlib.runners.gdmax_experiments import grid_experiment_3x3
-from agtlib.cooperative.base import PolicyNetwork
-from agtlib.cooperative.ppo import PPO, IPPO
-from agtlib.utils.rollout import RolloutManager
-from agtlib.utils.env import SingleAgentEnvWrapper, MultiGridWrapper, generate_reward
+from treasure_hunt import TeamEmptyEnv
 
-from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
-from agtlib.utils.stable_baselines.monitor import Monitor
-
-
-from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
-import multigrid
-
-import warnings
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
@@ -48,7 +46,7 @@ if __name__ == "__main__":
 
     # MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     
-    grid_experiment_3x3(MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)))
+    grid_experiment_3x3(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     # SubprocVecEnv([lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))])
     # ippo = IPPO(4, 15, 3)
     # ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", agents=3)), n_envs = 32, n_updates=1000, rollout_length=100)

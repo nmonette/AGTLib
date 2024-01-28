@@ -1,13 +1,13 @@
 from time import sleep, time
 
 import gymnasium as gym
-import torch
 import matplotlib.pyplot as plt
+import torch
 
-from ..cooperative.pg import SoftmaxPolicy, MAPolicyNetwork
-from ..cooperative.pg import GDmax as GDMax, NGDmax
-from ..cooperative.pg_parallel import GDmax as PGDMax
 from ..cooperative.base import PolicyNetwork
+from ..cooperative.pg import GDmax as GDMax
+from ..cooperative.pg import MAPolicyNetwork, NGDmax, SoftmaxPolicy
+from ..cooperative.pg_parallel import GDmax as PGDMax
 from ..cooperative.ppo import advPPO
 from ..utils.env import MultiGridWrapper
 
@@ -18,7 +18,7 @@ def grid_experiment_3x3(env1):
     
     # gdm = PGDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10)
     # gdm = GDMax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50)
-    gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, disable_env_checker=True, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
+    gdm = NGDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
     for i in range(100):
         x = time()
         gdm.step()

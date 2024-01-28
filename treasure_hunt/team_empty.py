@@ -1,15 +1,16 @@
 from __future__ import annotations
-
 from random import randint, shuffle
+import random
 
-from multigrid.base import TeamMultiGridEnv
-from multigrid.core import Agent, BallAgent, Grid
-from multigrid.core.constants import Direction
-from multigrid.core.world_object import Goal
+# from multigrid.base import TeamMultiGridEnv
+# from multigrid.core import Grid, Agent, BallAgent
+# from multigrid.core.constants import Direction
+# from multigrid.core.world_object import Goal
+from ..core.grid import Grid
 from multigrid.utils.obs import gen_obs_grid_encoding
 
 
-class TeamEmptyEnv(TeamMultiGridEnv):
+class TeamEmptyEnv():
     """
     .. image:: https://i.imgur.com/wY0tT7R.gif
         :width: 200
@@ -113,13 +114,13 @@ class TeamEmptyEnv(TeamMultiGridEnv):
     def __init__(
         self,
         size: int = 8,
-        agents: int = 3,
-        agent_start_pos: tuple[int, int] | None = None,
-        agent_start_dir: Direction | None = Direction.right,
-        max_steps: int | None = None,
-        joint_reward: bool = False,
-        success_termination_mode: str = 'all',
-        **kwargs):
+        num_team1: int = 2,
+        num_team2: int = 1,
+    ):
+        # max_steps: int | None = None,
+        # joint_reward: bool = False,
+        # success_termination_mode: str = 'all',
+        # **kwargs):
         """
         Parameters
         ----------
@@ -139,19 +140,24 @@ class TeamEmptyEnv(TeamMultiGridEnv):
         **kwargs
             See :attr:`multigrid.base.MultiGridEnv.__init__`
         """
-        agents = [BallAgent(index=i, view_size=7, see_through_walls=True) for i in range(agents)]
-        self.agent_start_pos = agent_start_pos
-        self.agent_start_dir = agent_start_dir
+        # agents = [BallAgent(index=i, view_size=7, see_through_walls=True) for i in range(agents)]
+        # self.agent_start_pos = agent_start_pos
+        # self.agent_start_dir = agent_start_dir
+        # Generating all coordinates of the grid
+        self.COORD_PAIRS = [(i,j) for i in range(1,size-1) for j in range(1,size-1)]
+        self.num_team1 = num_team1
+        self.num_team2 = num_team2
+        self.size = size
 
-        super().__init__(
-            mission_space="get to the closest green square without an agent on it",
-            grid_size=size,
-            max_steps=max_steps or (4 * size**2),
-            joint_reward=joint_reward,
-            success_termination_mode=success_termination_mode,
-            agents = agents,
-            **kwargs,
-        )
+        # super().__init__(
+        #     mission_space="get to the closest green square without an agent on it",
+        #     grid_size=size,
+        #     max_steps=max_steps or (4 * size**2),
+        #     joint_reward=joint_reward,
+        #     success_termination_mode=success_termination_mode,
+        #     agents = agents,
+        #     **kwargs,
+        # )
 
     def on_success(
         self,
@@ -212,40 +218,45 @@ class TeamEmptyEnv(TeamMultiGridEnv):
 
         return observations
 
-    def _gen_grid(self, width, height):
+    def _gen_grid(self):
         """
         :meta private:
         """
-        # Generating all coordinates of the grid
-        coords = [(i,j) for i in range(1,width-1) for j in range(1,height-1)]
-        shuffle(coords)
+        
         # Create an empty grid
-        self.grid = Grid(width, height)
+        self.grid = Grid(self.size, self.size)
+        idxs = [i for i in range(len(self.COORD_PAIRS))]
 
         # Generate the surrounding walls
-        self.grid.wall_rect(0, 0, width, height)
+        # self.grid.wall_rect(0, 0, width, height)
+
+        goal_1_idx = random.choice(idxs)
+        idxs.pop(goal_1_idx)
+        goal_2_idx = random.choice(idxs)
+        idxs.pop(goal_2_idx)
         
         # Place a goal square in the bottom-right corner
-        self.goal1 = coords.pop()
-        self.goal2 = coords.pop()
-        self.put_obj(Goal(), *self.goal1)
-        self.put_obj(Goal(), *self.goal2)
+        self.place_goals(self.COORD_PAIRS[goal_1_idx], self.COORD_PAIRS[goal_2_idx])
 
         self.goal1_terminated = False
         self.goal2_terminated = False
 
         # Place the agent
-        for agent in self.agents:
-            # Setting team colors
-            if agent.index < self.num_agents - (self.num_agents // 2):
-                agent.state.color = "blue"
-            else:       
-                agent.state.color = "red"
+        # for agent in self.agents:
+        #     # Setting team colors
+        #     if agent.index < self.num_agents - (self.num_agents // 2):
+        #         agent.state.color = "blue"
+        #     else:       
+        #         agent.state.color = "red"
             
-            if self.agent_start_pos is not None and self.agent_start_dir is not None:
-                agent.state.pos =  self.agent_start_pos
-                agent.state.dir = self.agent_start_dir
-            else:
-                self.place_agent(agent)
+        #     if self.agent_start_pos is not None and self.agent_start_dir is not None:
+        #         agent.state.pos =  self.agent_start_pos
+        #         agent.state.dir = self.agent_start_dir
+        #     else:
+        #         self.place_agent(agent)
+
+        team_1_agents = [self.COORD_PAIRS[random.choice(idxs)] for i in range(self.num_team1)]
+        team_2_agents = [self.COORD_PAIRS[random.choice(idxs)] for i in range(self.num_team2)]
+        self.grid.place_agents(team_1_agents, team_2_agents)
 
             
