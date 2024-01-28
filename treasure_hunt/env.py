@@ -15,6 +15,9 @@ class TeamEmptyEnv(gym.Env):
         self.num_agents_t1 = num_agents_t1
         self.num_agents_t2 = num_agents_t2
 
+        self.observation_space = gym.spaces.MultiDiscrete(dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2)
+        self.action_space = gym.spaces.Discrete(4)
+
     def step(self, actions) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray], dict[int, np.ndarray], dict[int, np.ndarray], dict]:
         """
         Returns obs, reward, done, trunc, info
