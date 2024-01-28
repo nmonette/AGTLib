@@ -50,7 +50,6 @@ class MultiGridWrapper(gym.Wrapper):
 
     def reset(self, *args, **kwargs):
         obs, _ = self.env.reset(**kwargs)
-        print(obs)
         for i in obs:
             obs[i] = np.concatenate([np.array(j).flatten() for j in obs[i].values()])
 

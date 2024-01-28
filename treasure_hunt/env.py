@@ -26,7 +26,7 @@ class TeamEmptyEnv(gym.Env):
         obs = self.grid.get_state()
         return {i:obs for i in range(self.num_agents_t1+self.num_agents_t2)}, rewards, done, trunc, {}
 
-    def reset(self) -> tuple[np.ndarray, dict[str, Any]]:
+    def reset(self, *args, **kargs) -> tuple[np.ndarray, dict[str, Any]]:
         self.grid = Grid(self.dim, self.num_agents_t1, self.num_agents_t2)
         obs = self.grid.get_state()
         return {i:obs for i in range(self.num_agents_t1+self.num_agents_t2)}, {}

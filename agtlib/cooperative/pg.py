@@ -258,5 +258,114 @@ class NGDmax(GDmax):
 class LGDmax:
     """
     GDMax optimization algorithm
-    that is working on 
+    that is working on the lambda space
+
+    param dims is for the team
     """
+    #   action to team map is like [(i,j) for i in range(actions) for j in range(actions)]
+    #   team to action map is like np.cumsum(np.ones((3,3))) - 1 and turns a group action into an index
+    def __init__(self, obs_size, action_size, n_states, action_map, param_dims, lambda_dims, env, gamma=0.9, lr=0.01, rollout_length=50):
+        self.param_dims = param_dims
+        self.lambda_dims = lambda_dims
+        self.n_states = n_states
+        self.action_map = action_map
+        self.rollout_length = rollout_length
+        self.env = env()
+
+        self.team_policy = SoftmaxPolicy(15, 4, param_dims)
+        self.adv_policy = PolicyNetwork(15, 4)
+
+        self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr)
+        self.adv_optimizer = torch.optim.Adam(self.adv_optimizer.parameters(), lr=lr)
+
+    def find_lambda(self):
+        lambda_ = torch.zeros(self.lambda_dims)
+        for i in range(self.rollout_length):
+            gamma = 1
+            obs, _ = self.env.reset()
+            while True:
+                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                action = {}
+                
+                for i in range(self.team_size):
+                    action[i] = team_action[i]
+                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
+                obs, reward, done, trunc, _ = self.env.step(action) 
+
+                lambda_[*obs[0], *[action[i] for i in range(len(action) - 2)]] += 1 * gamma
+
+                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    break
+
+                gamma *= self.gamma
+
+        return lambda_
+    
+    def rollout(self, adversary=True):
+        """
+        Rollout to calculate loss
+        """
+        log_probs = []
+        rewards = []
+
+        env = self.env # ()
+        for episode in range(self.n_rollouts):
+            obs, _ = env.reset()
+            ep_log_probs = []
+            ep_rewards = []
+            while True:
+                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                action = {}
+                for i in range(self.team_size):
+                    action[i] = team_action[i]
+                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
+                obs, reward, done, trunc, _ = env.step(action) 
+                if adversary:
+                    ep_log_probs.append(adv_log_prob)
+                    ep_rewards.append(reward[len(reward) - 1])
+                else:
+                    ep_log_probs.append(torch.sum(team_log_prob))
+                    ep_rewards.append(reward[0])
+
+                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    break # >= 2 comes from 2 terminal states in treasure hunt
+            
+            log_probs.append(ep_log_probs)
+            rewards.append(ep_rewards)
+
+        return self.calculate_team_loss(log_probs, rewards)
+        
+    def calculate_team_loss(self, log_probs, rewards):
+        left = []
+        right = []
+        for i in range(len(rewards)):
+            gamma = 1
+            disc_reward = 0 
+            log_prob = sum(log_probs[i])
+            for j in range(len(rewards[i])): # we may need to do this sum with torch to allow for backpropagtion?
+                disc_reward += gamma * rewards[i][j] 
+                gamma *= self.gamma
+
+            left.append(disc_reward)
+            right.append(log_prob)
+
+        disc_reward = torch.tensor(left)
+        log_probs = torch.stack(right)
+
+        return -torch.mean(disc_reward * log_probs)
+    
+    def step(self):
+        right_half = self.reward_table @ self.team_policy.params.detach()
+        for _ in range(100): # self.num_steps
+            lambda_ = self.find_lambda()
+            adv_loss = lambda_.flatten().T @ right_half
+
+            self.adv_optimizer.zero_grad()
+            adv_loss.backward()
+            self.adv_optimizer.step()
+            
+        team_loss = self.rollout(adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
+        
+        self.team_policy.step(team_loss)
+        adv_utility, team_utility = self.get_utility(calc_logs=False)
+            

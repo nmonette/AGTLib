@@ -58,7 +58,7 @@ class GDmax:
         self.n_rollouts = n_rollouts
         self.num_steps = n_rollouts * 10
 
-        self.rollout_env = SubprocVecEnv([self.env for _ in range(5)])
+        self.rollout_env = SubprocVecEnv([self.env for _ in range(4)])
         
         self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr)
@@ -76,8 +76,8 @@ class GDmax:
         buffer = MCBuffer(self.n_rollouts, n_envs, 2 if adversary else 0)
         obs = env.reset()
         while not complete:
-            team_obs = torch.from_numpy(obs[0]).int()
-            adv_obs = torch.from_numpy(obs[len(obs)-1]).float()
+            team_obs = torch.tensor([obs[i][0] for i in range(len(obs))]).int()
+            adv_obs = torch.tensor([obs[i][len(obs[0])-1] for i in range(len(obs))]).float()
 
             team_action, team_log_prob = self.team_policy.get_actions(team_obs)
             adv_action, adv_log_prob = self.adv_policy.get_action(adv_obs)
@@ -165,6 +165,7 @@ class GDmax:
             # adv_loss.backward()
             total_loss.backward()
             self.adv_optimizer.step()
+            print(f"adversary step {_}")
 
         team_loss = self.rollout(rollout_envs, n_envs, adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
         self.team_policy.step(team_loss)
