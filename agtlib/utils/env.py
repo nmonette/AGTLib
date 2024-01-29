@@ -247,6 +247,4 @@ class PettingZooWrapper(gym.Wrapper):
         return new, infos 
     
     def render(self):
-        self.env.render()
-
-
+        return self.env.render()

@@ -8,6 +8,9 @@ import gymnasium as gym
 import numpy as np
 import torch
 from gymnasium import register
+# from pettingzoo.test import render_test
+# from pettingzoo.mpe import simple_adversary_v3
+
 
 import multigrid
 from agtlib.cooperative.base import PolicyNetwork
@@ -27,9 +30,9 @@ from treasure_hunt import TeamEmptyEnv
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
-    mpe_experiment()
+    # mpe_experiment()
     # generate_reward_3x3()
-    print("done")
+    # print("done")
     # env_dict = gym.envs.registration.registry.copy()
 
     # # for env in env_dict:
@@ -50,7 +53,7 @@ if __name__ == "__main__":
 
     # MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     
-    # grid_experiment_3x3(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
+    grid_experiment_3x3(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     # SubprocVecEnv([lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))])
     # ippo = IPPO(4, 15, 3)
     # ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", agents=3)), n_envs = 32, n_updates=1000, rollout_length=100)
