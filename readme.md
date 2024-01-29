@@ -1,7 +1,7 @@
 # Installation Instructions
 1. I suggest you create a venv in the directory where you clone this:
 ```py
-python venv "VENV NAME"
+python -m venv "VENV NAME"
 ```
 2. Install multigrid environment
 ```py
