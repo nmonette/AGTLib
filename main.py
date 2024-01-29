@@ -12,10 +12,11 @@ from gymnasium import register
 import multigrid
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import IPPO, PPO
-from agtlib.runners.gdmax_experiments import grid_experiment_3x3
+from agtlib.runners.gdmax_experiments import grid_experiment_3x3, mpe_experiment
 from agtlib.utils.env import (MultiGridWrapper, SingleAgentEnvWrapper,
                               generate_reward)
 from agtlib.utils.rollout import RolloutManager
+from agtlib.utils.reward_table import generate_reward_3x3
 from agtlib.utils.stable_baselines.monitor import Monitor
 from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
 from multigrid.multigrid.envs.team_empty import TeamEmptyEnv
@@ -26,6 +27,9 @@ from treasure_hunt import TeamEmptyEnv
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
+    mpe_experiment()
+    # generate_reward_3x3()
+    print("done")
     # env_dict = gym.envs.registration.registry.copy()
 
     # # for env in env_dict:
@@ -46,7 +50,7 @@ if __name__ == "__main__":
 
     # MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     
-    grid_experiment_3x3(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
+    # grid_experiment_3x3(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     # SubprocVecEnv([lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))])
     # ippo = IPPO(4, 15, 3)
     # ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", agents=3)), n_envs = 32, n_updates=1000, rollout_length=100)

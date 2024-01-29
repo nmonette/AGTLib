@@ -197,4 +197,56 @@ def generate_reward(dim, n_agents):
         np.save(f, table)
     return table
 
+class PettingZooWrapper(gym.Wrapper):
+    def __init__(self, env):
+        self.env = env
+
+    def step(self, action):
+        new = {}
+        for i in action:
+            if i == len(action) - 1:
+                new["adversary_0"] = action[i]
+            else:
+                new[f"agent_{i}"] = action[i]
+
+        observations, rewards, terminations, truncations, infos =  self.env.step(new)
+        obs = {}
+        rew = {}
+        done = {}
+        trunc = {}
+        
+        count = 0
+        for i in observations:
+            if i == "adversary_0":
+                obs[len(observations) - 1] = observations["adversary_0"]
+                rew[len(observations) - 1] = rewards["adversary_0"]
+                done[len(observations) - 1] = terminations["adversary_0"]
+                trunc[len(observations) - 1] = truncations["adversary_0"]
+            else:
+                obs[count] = observations[i]
+                rew[count] = rewards[i]
+                done[count] = terminations[i]
+                trunc[count] = truncations[i]
+                count += 1
+
+        return obs, rew, done, trunc, infos
+
+    
+    def reset(self, *args, **kwargs):
+        obs, infos =  self.env.reset(*args, **kwargs)
+        
+        new = {}
+        count = 0
+        for i in obs:
+            if i == "adversary_0":
+                new[len(obs) - 1] = obs["adversary_0"]
+            else:
+                new[count] = obs[i]
+                count += 1
+
+        return new, infos 
+    
+    def render(self):
+        self.env.render()
+
 

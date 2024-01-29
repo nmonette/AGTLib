@@ -3,31 +3,32 @@ from time import sleep, time
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import torch
+from pettingzoo.mpe import simple_adversary_v3
 
 from ..cooperative.base import PolicyNetwork
 from ..cooperative.pg import GDmax as GDMax
 from ..cooperative.pg import MAPolicyNetwork, NGDmax, SoftmaxPolicy
 from ..cooperative.pg_parallel import GDmax as PGDMax
 from ..cooperative.ppo import advPPO
-from ..utils.env import MultiGridWrapper
+from ..utils.env import MultiGridWrapper, PettingZooWrapper
 
 # ray.init()
 
 def grid_experiment_3x3(env1):
     dim = 3
     
-    gdm = PGDMax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10, lr=0.1)
+    # gdm = PGDMax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10, lr=0.1)
     # gdm = GDMax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50, lr=0.1)
-    # gdm = NGDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
-    for i in range(100):
+    gdm = NGDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
+    for i in range(10000):
         x = time()
-        gdm.step(4) # 4
+        gdm.step() # 4
         print(f"iteration {i} done in {time() - x}s")
-
-    team = gdm.team_policy
-    torch.save(team.state_dict(), f"{dim}x{dim}-team-policy.pt")
-    adv = gdm.adv_policy
-    torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy.pt")
+        if i % 1000 == 0:
+            team = gdm.team_policy
+            torch.save(team.state_dict(), f"{dim}x{dim}-team-policy-step{i+1}.pt")
+            adv = gdm.adv_policy
+            torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy-step{i+1}.pt")
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
@@ -92,3 +93,63 @@ def grid_experiment_3x3(env1):
             sleep(0.5)
             if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                 break
+
+def mpe_experiment():
+    # env = lambda: PettingZooWrapper(simple_adversary_v3.parallel_env(N=2, continuous_actions=False, max_cycles=12))
+    # gdm = NGDmax(10,5, env, param_dims=None, n_rollouts=50, lr=0.1, adv_obs_size=8)
+
+    # for i in range(100):
+    #     x = time()
+    #     gdm.step() # 4
+    #     print(f"iteration {i} done in {time() - x}s")
+    #     if i % 1000 == 0:
+    #         team = gdm.team_policy
+    #         torch.save(team.state_dict(), f"mpe-team-policy-step{i+1}.pt")
+    #         adv = gdm.adv_policy
+    #         torch.save(adv.state_dict(), f"mpe-adv-policy-step{i+1}.pt")
+            
+            
+    # team = gdm.team_policy
+    # torch.save(team.state_dict(), f"mpe-team-policy-final.pt")
+    # adv = gdm.adv_policy
+    # torch.save(adv.state_dict(), f"mpe-adv-policy-final.pt")
+
+    # fig, (ax1, ax2) = plt.subplots(1, 2)
+
+    # fig.suptitle("GDMax with MPE")
+    # ax1.set_title("Adversary Mean Episode Rewards")
+    # ax1.set_xlabel("Iterations")
+    # ax1.set_ylabel("Mean Reward")
+    # ax1.plot(gdm.episode_avg_adv_rewards)
+    # ax2.set_title("Team Mean Episode Rewards")
+    # ax2.set_xlabel("Iterations")
+    # ax2.set_ylabel("Mean Reward")
+    # ax2.plot(gdm.episode_avg_team_rewards)
+
+    # fig.savefig("gdmax_experiment_rewards_mpe.png")
+    team = MAPolicyNetwork(10, 25, [(i,j) for i in range(5) for j in range(5)])
+    adv = PolicyNetwork(8, 5)
+
+    team.load_state_dict(torch.load(f"mpe-team-policy-final.pt"))
+    adv.load_state_dict(torch.load(f"mpe-adv-policy-final.pt"))
+
+    
+    env = PettingZooWrapper(simple_adversary_v3.parallel_env(N=2, continuous_actions=False, max_cycles=12, render_mode="human"))
+    for episode in range(100):
+        obs, _ = env.reset()
+        env.render()
+        while True:
+            team_action, _ = team.get_actions(obs[0])
+            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            action = {i: team_action[i] for i in range(len(team_action))}
+            action[len(action)] = adv_action.item()
+            obs, reward, trunc, done, _ = env.step(action)
+            # print(action, reward)
+            # sleep(0.5)
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
+
+
+
+

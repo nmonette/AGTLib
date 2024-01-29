@@ -115,7 +115,8 @@ class GDmax:
         
         self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr)
-        self.team_policy = SoftmaxPolicy(2, 4, param_dims) 
+        if param_dims is not None:
+            self.team_policy = SoftmaxPolicy(2, 4, param_dims) 
 
         self.episode_avg_adv_rewards = []
         self.adv_loss = []
@@ -138,7 +139,8 @@ class GDmax:
                 action = {}
                 for i in range(self.team_size):
                     action[i] = team_action[i]
-                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
+                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[len(obs) - 1]).float())
+                action[i+1] = action[i+1].item()
                 obs, reward, done, trunc, _ = env.step(action) 
                 if adversary:
                     ep_log_probs.append(adv_log_prob)
@@ -170,7 +172,8 @@ class GDmax:
                 
                 for i in range(self.team_size):
                     action[i] = team_action[i]
-                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
+                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[len(obs) - 1]).float())
+                action[i+1] = action[i+1].item()
                 obs, reward, done, trunc, _ = self.env.step(action) 
                 
                 if calc_logs:
@@ -232,9 +235,12 @@ class NGDmax(GDmax):
     with a neural network instead of 
     direct parameteriation.
     """
-    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], team_size: int = 2, lr: float = 0.01, gamma:float = 0.9, n_rollouts:int = 100):
-        super().__init__(obs_size, action_size, env, param_dims, hl_dims, team_size, lr, gamma, n_rollouts)
-        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
+    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], team_size: int = 2, lr: float = 0.01, gamma:float = 0.9, n_rollouts:int = 100, adv_obs_size = None):
+        if adv_obs_size is not None:
+            super().__init__(adv_obs_size, action_size, env, param_dims, hl_dims, team_size, lr, gamma, n_rollouts)
+        else:
+            super().__init__(obs_size, action_size, env, param_dims, hl_dims, team_size, lr, gamma, n_rollouts)
+        self.team_policy = MAPolicyNetwork(obs_size, action_size * action_size, [(i,j) for i in range(action_size) for j in range(action_size)])
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr)
 
     def step(self):
@@ -292,7 +298,7 @@ class LGDmax:
                 action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
                 obs, reward, done, trunc, _ = self.env.step(action) 
 
-                lambda_[*obs[0], *[action[i] for i in range(len(action) - 2)]] += 1 * gamma
+                lambda_[*obs[0], *[action[i] for i in range(len(action) - 2)]] += torch.exp(adv_log_prob) * gamma
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                     break
