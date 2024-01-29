@@ -30,6 +30,12 @@ from treasure_hunt import TeamEmptyEnv
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
+    # lambda_ = torch.zeros((1, 125))
+    # reward = torch.zeros(5, 125)
+    # x = torch.zeros((1, 25))
+
+    # print(torch.ger(lambda_, (x @ reward)).shape)
+
     # mpe_experiment()
     # generate_reward_3x3()
     # print("done")
