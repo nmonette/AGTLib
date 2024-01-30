@@ -12,8 +12,9 @@ pip install -e .
 ```py
 cd ..
 pip install -r requirements.txt
+4. Unzip "3x3-3-agents-table.npy.zip" into the root directory 
 ```
-4. Run experiments:
+5. Run experiments:
 ```py
 python -m main
 ```
