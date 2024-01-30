@@ -177,9 +177,9 @@ def lgdmax_grid_experiment():
         print(f"iteration {i} done in {time() - x}s")
     
     team = gdm.team_policy
+    torch.save(team.state_dict(), f"3x3-team-policy-final-lambda.pt")
     adv = gdm.adv_policy
-    team.load_state_dict(torch.load(f"{3}x{3}-team-policy-final-lambda.pt"))
-    adv.load_state_dict(torch.load(f"{3}x{3}-adv-policy-final-lambda.pt"))
+    torch.save(adv.state_dict(), f"3x3-adv-policy-final-lambda.pt")
 
     env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
     for episode in range(100):
