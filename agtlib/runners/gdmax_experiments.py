@@ -4,10 +4,11 @@ import gymnasium as gym
 from gymnasium.wrappers import RecordVideo
 import matplotlib.pyplot as plt
 import torch
+import numpy as np
 # from pettingzoo.mpe import simple_adversary_v3
 
 from ..cooperative.base import PolicyNetwork
-from ..cooperative.pg import GDmax as GDMax
+from ..cooperative.pg import GDmax as GDMax, LGDmax
 from ..cooperative.pg import MAPolicyNetwork, NGDmax, SoftmaxPolicy
 from ..cooperative.pg_parallel import GDmax as PGDMax
 from ..cooperative.ppo import advPPO
@@ -164,5 +165,20 @@ def grid_experiment_3x3(env1):
     # env.close_video_recorder()
 
 
+def LGDmaxExperiment():
+    num_states = torch.prod(torch.tensor([3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2])).item()
+    table = torch.from_numpy(np.load("3x3-3-agents-table.npy")).reshape(num_states, 4, 16).double()
+    gdm = LGDmax(15, 4, num_states, [(i,j) for i in range(4) for j in range(4)], [3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 16], [3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 4],
+                 table, env=lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)))
+
+    for i in range(100):
+        x = time()
+        gdm.step() # 4
+        print(f"iteration {i} done in {time() - x}s")
+    
+    team = gdm.team_policy
+    adv = gdm.adv_policy
+    team.load_state_dict(torch.load(f"{3}x{3}-team-policy-final.pt"))
+    adv.load_state_dict(torch.load(f"{3}x{3}-adv-policy-final.pt"))
 
 

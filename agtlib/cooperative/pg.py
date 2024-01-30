@@ -10,7 +10,7 @@ import multigrid
 from gymnasium import register
 
 class SoftmaxPolicy(nn.Module):
-    def __init__(self, n_agents, n_actions, param_dims, lr= 0.01):
+    def __init__(self, n_agents, n_actions, param_dims, lr= 0.01, action_map=None):
         super(SoftmaxPolicy, self).__init__()
         self.lr = lr
 
@@ -18,19 +18,24 @@ class SoftmaxPolicy(nn.Module):
         self.n_actions = n_actions
         self.param_dims = param_dims
 
+        self.action_map = action_map
+
         empty = torch.empty(*param_dims)
         nn.init.orthogonal_(empty)
         self.params = nn.Parameter(nn.Softmax()(empty), requires_grad=True)
         
 
     def forward(self, x):
-        return self.params[*x, :, :]
+        return self.params[*x, :]
 
     def get_actions(self, x):
         dist = torch.distributions.Categorical(self.forward(x)) # make categorical distribution and then decode the action index
         action = dist.sample()
         log_prob = dist.log_prob(action)
-        return action, log_prob
+        if self.action_map is not None:
+            return self.action_map[action], log_prob
+        else:
+            return action, log_prob
     
     def step(self, loss):
         loss.backward(inputs=(self.params,)) # inputs=(self.params,)
@@ -270,22 +275,27 @@ class LGDmax:
     """
     #   action to team map is like [(i,j) for i in range(actions) for j in range(actions)]
     #   team to action map is like np.cumsum(np.ones((3,3))) - 1 and turns a group action into an index
-    def __init__(self, obs_size, action_size, n_states, action_map, param_dims, lambda_dims, env, gamma=0.9, lr=0.01, rollout_length=50):
+    def __init__(self, obs_size, action_size, n_states, action_map, param_dims, lambda_dims, reward_table, env, gamma=0.9, lr=0.1, rollout_length=50):
+        self.action_size = action_size
         self.param_dims = param_dims
         self.lambda_dims = lambda_dims
+        self.reward_table = reward_table
         self.n_states = n_states
         self.action_map = action_map
         self.rollout_length = rollout_length
         self.env = env()
 
-        self.team_policy = SoftmaxPolicy(15, 4, param_dims)
-        self.adv_policy = PolicyNetwork(15, 4)
+        self.lr = lr
+        self.gamma = gamma
+
+        self.team_policy = SoftmaxPolicy(obs_size, action_size*action_size, param_dims, action_map=self.action_map)
+        self.adv_policy = PolicyNetwork(obs_size, action_size)
 
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr)
-        self.adv_optimizer = torch.optim.Adam(self.adv_optimizer.parameters(), lr=lr)
+        self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr)
 
     def find_lambda(self):
-        lambda_ = torch.zeros(self.lambda_dims)
+        lambda_ = torch.zeros(self.lambda_dims, dtype=torch.double)
         for i in range(self.rollout_length):
             gamma = 1
             obs, _ = self.env.reset()
@@ -293,7 +303,7 @@ class LGDmax:
                 team_action, team_log_prob = self.team_policy.get_actions(obs[0])
                 action = {}
                 
-                for i in range(self.team_size):
+                for i in range(len(team_action)):
                     action[i] = team_action[i]
                 action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
                 obs, reward, done, trunc, _ = self.env.step(action) 
@@ -305,7 +315,7 @@ class LGDmax:
 
                 gamma *= self.gamma
 
-        return lambda_
+        return lambda_ * (1 / self.rollout_length)
     
     def rollout(self, adversary=True):
         """
@@ -315,14 +325,14 @@ class LGDmax:
         rewards = []
 
         env = self.env # ()
-        for episode in range(self.n_rollouts):
+        for episode in range(self.rollout_length):
             obs, _ = env.reset()
             ep_log_probs = []
             ep_rewards = []
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                team_action, team_log_prob = self.team_policy.get_actions(obs[len(obs)-1])
                 action = {}
-                for i in range(self.team_size):
+                for i in range(len(team_action)):
                     action[i] = team_action[i]
                 action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[0]).float())
                 obs, reward, done, trunc, _ = env.step(action) 
@@ -360,11 +370,46 @@ class LGDmax:
 
         return -torch.mean(disc_reward * log_probs)
     
+    def get_utility(self, calc_logs=True):
+        """
+        Finds utility with both strategies fixed, averaged across 
+        """
+        for episode in range(self.rollout_length):
+            obs, _ = self.env.reset()
+            log_prob_rewards = []
+            rewards = []
+
+            while True:
+                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                action = {}
+                
+                for i in range(len(team_action)):
+                    action[i] = team_action[i]
+                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[len(obs) - 1]).float())
+                action[i+1] = action[i+1].item()
+                obs, reward, done, trunc, _ = self.env.step(action) 
+                
+                if calc_logs:
+                    log_prob_rewards.append(reward[0] * (adv_log_prob.detach() + torch.sum(team_log_prob)))
+                rewards.append(reward[0])
+
+                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    break # >= 2 comes from 2 terminal states in treasure hunt
+
+            if calc_logs:
+                # avg_utility = torch.mean(torch.tensor(log_rewards), requires_grad = True)
+                avg_utility = sum(log_prob_rewards) / len(log_prob_rewards)
+                # expected_utility = self.team_policy.params.flatten().T @ self.reward_table.flatten().float()
+                return avg_utility
+            else:
+                return -torch.mean(torch.tensor(rewards).float()).item(), torch.mean(torch.tensor(rewards).float()).item()
+    
     def step(self):
-        right_half = self.reward_table @ self.team_policy.params.detach()
-        for _ in range(100): # self.num_steps
-            lambda_ = self.find_lambda()
-            adv_loss = lambda_.flatten().T @ right_half
+        # table has dims S 4 16, team params has dims S 16
+        right_half = torch.einsum("ijk,ik->ij", self.reward_table.double(), self.team_policy.params.detach().view(self.n_states, self.action_size*self.action_size).double()).flatten()
+        for _ in range(10): # self.num_steps
+            lambda_ = self.find_lambda().flatten()
+            adv_loss = torch.dot(lambda_, right_half)
 
             self.adv_optimizer.zero_grad()
             adv_loss.backward()
