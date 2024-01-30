@@ -90,7 +90,7 @@ def grid_experiment_3x3(env1):
         env.render()
         while True:
             team_action, _ = team.get_actions(obs[0])
-            adv_action, _ = adv.get_action(torch.tensor(obs[0]).float())
+            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action
@@ -165,7 +165,7 @@ def grid_experiment_3x3(env1):
     # env.close_video_recorder()
 
 
-def LGDmaxExperiment():
+def lgdmax_grid_experiment():
     num_states = torch.prod(torch.tensor([3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2])).item()
     table = torch.from_numpy(np.load("3x3-3-agents-table.npy")).reshape(num_states, 4, 16).double()
     gdm = LGDmax(15, 4, num_states, [(i,j) for i in range(4) for j in range(4)], [3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 16], [3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 4],
@@ -180,5 +180,21 @@ def LGDmaxExperiment():
     adv = gdm.adv_policy
     team.load_state_dict(torch.load(f"{3}x{3}-team-policy-final.pt"))
     adv.load_state_dict(torch.load(f"{3}x{3}-adv-policy-final.pt"))
+
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    for episode in range(100):
+        obs, _ = env.reset()
+        env.render()
+        while True:
+            team_action, _ = team.get_actions(obs[0])
+            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            action = {i: team_action[i] for i in range(len(team_action))}
+            action[len(action)] = adv_action
+            obs, reward, trunc, done, _ = env.step(action)
+            print(action, reward)
+            sleep(0.5)
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
 
 
