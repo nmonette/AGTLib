@@ -200,9 +200,9 @@ def lgdmax_grid_experiment():
                 break
 
 def nlgdmax_grid_experiment():
-    gdm = NLGDmax(15, 4, [(i,j) for i in range(4) for j in range(4)], env=lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)))
+    gdm = NLGDmax(15, 4, [(i,j) for i in range(4) for j in range(4)], env=lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)),lr=0.01)
 
-    for i in range(100):
+    for i in range(1000):
         x = time()
         gdm.step() # 4
         print(f"iteration {i} done in {time() - x}s")
