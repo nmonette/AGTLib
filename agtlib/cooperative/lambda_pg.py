@@ -238,7 +238,7 @@ class NLGDmax:
         for i in range(self.rollout_length):
             self.adv_optimizer.zero_grad()
             policy_features = self.adv_policy.forward_init(init_data[i])
-            loss = torch.dot(self.lambda_network.forward(policy_features), reward_vec[i])
+            loss = -torch.dot(self.lambda_network.forward(policy_features), reward_vec[i])
             loss.backward()
             self.adv_optimizer.step()
             
