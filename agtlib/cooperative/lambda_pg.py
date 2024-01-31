@@ -114,7 +114,7 @@ class NLGDmax:
     """
     Lambda GDmax with Neural Networks... lots of them.
     """
-    def __init__(self, obs_size, action_size, action_map, env, gamma=0.9, lr=0.1, rollout_length=50, fm_dim1=64, fm_dim2=128):
+    def __init__(self, obs_size, action_size, action_map, env, gamma=0.9, lr=0.1, rollout_length=50, fm_dim1=64, fm_dim2=128, epochs=100):
         self.obs_size = obs_size
         self.action_size = action_size
         self.action_map = action_map
@@ -124,6 +124,7 @@ class NLGDmax:
         self.gamma = gamma
         self.lr = lr
         self.rollout_length = rollout_length
+        self.epochs=epochs
         
         self.fm_dim1 = fm_dim1
         self.fm_dim2 = fm_dim2
@@ -180,14 +181,16 @@ class NLGDmax:
         lambda_data = torch.stack(obs_data)
         init_data = torch.stack(init_obs)
 
-        policy_features = self.adv_policy.forward_init(init_data)
-        predictions = self.lambda_network.forward(policy_features)
+        for epoch in range(self.epochs):
+            self.lambda_optimizer.zero_grad()
+            
+            policy_features = self.adv_policy.forward_init(init_data)
+            predictions = self.lambda_network.forward(policy_features)
 
-        
-        self.lambda_optimizer.zero_grad()
-        loss = nn.MSELoss()(predictions, lambda_data)
-        loss.backward()
-        self.lambda_optimizer.step()
+            
+            loss = nn.MSELoss()(predictions, lambda_data)
+            loss.backward(retain_graph = epoch != 99)
+            self.lambda_optimizer.step()
 
         return reward_data, init_data
 

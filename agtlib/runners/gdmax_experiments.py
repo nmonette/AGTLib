@@ -209,7 +209,7 @@ def nlgdmax_grid_experiment():
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    fig.suptitle("PPO with Adversarial TMG")
+    fig.suptitle("NLGDmax with Adversarial TMG")
     ax1.set_title("Adversary Mean Episode Rewards")
     ax1.set_xlabel("Iterations")
     ax1.set_ylabel("Mean Reward")
