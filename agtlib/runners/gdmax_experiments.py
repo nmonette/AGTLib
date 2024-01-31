@@ -206,6 +206,20 @@ def nlgdmax_grid_experiment():
         x = time()
         gdm.step() # 4
         print(f"iteration {i} done in {time() - x}s")
+
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+
+    fig.suptitle("PPO with Adversarial TMG")
+    ax1.set_title("Adversary Mean Episode Rewards")
+    ax1.set_xlabel("Iterations")
+    ax1.set_ylabel("Mean Reward")
+    ax1.plot([-i for i in gdm.reward])
+    ax2.set_title("Team Mean Episode Rewards")
+    ax2.set_xlabel("Iterations")
+    ax2.set_ylabel("Mean Reward")
+    ax2.plot(gdm.reward)
+
+    fig.savefig("lgdmax_experiment_rewards.png")
     
     team = gdm.team_policy
     torch.save(team.state_dict(), f"3x3-team-policy-final-nlambda.pt")

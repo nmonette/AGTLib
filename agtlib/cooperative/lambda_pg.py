@@ -135,6 +135,9 @@ class NLGDmax:
         self.lambda_optimizer = torch.optim.Adam(self.lambda_network.parameters(), lr=lr)
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr)
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr)
+
+        # Metric for tracking progress
+        self.reward = []
     
     def find_lambda(self):
         obs_data = []
@@ -146,6 +149,8 @@ class NLGDmax:
             reward_vec = torch.zeros((self.fm_dim2,))
             obs, _ = self.env.reset()
             init_obs.append(torch.tensor(obs[len(obs)-1]).float())
+
+            rewards = []
             while True:
                 team_action, team_log_prob = self.team_policy.get_actions(torch.tensor(obs[0]).float())
                 action = {}
@@ -153,6 +158,8 @@ class NLGDmax:
                     action[i] = team_action[i]
                 action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[len(obs)-1]).float())
                 obs, reward, done, trunc, _ = self.env.step(action) 
+
+                rewards.append(reward[0])
 
                 obs_features = self.adv_policy.state_action_mapping(torch.tensor(obs[len(obs)-1]).float(), action[len(action)-1])
                 reward_features = self.adv_policy.reward_mapping(torch.tensor(obs[len(obs)-1]).float(), action[len(action)-1], torch.tensor(reward[len(reward)-1]).reshape(1))
@@ -167,6 +174,8 @@ class NLGDmax:
 
             obs_data.append(lambda_)
             reward_data.append(reward_vec)
+
+            self.reward.append(sum(rewards) / len(rewards))
 
         lambda_data = torch.stack(obs_data)
         init_data = torch.stack(init_obs)
