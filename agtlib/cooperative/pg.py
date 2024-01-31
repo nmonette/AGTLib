@@ -105,6 +105,7 @@ class MAPolicyNetwork(nn.Module):
         action = dist.sample()
         log_prob = dist.log_prob(action)
         return self.action_map[action], log_prob
+
         
 class GDmax:
     def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], team_size: int = 2, lr: float = 0.01, gamma:float = 0.9, n_rollouts:int = 100):

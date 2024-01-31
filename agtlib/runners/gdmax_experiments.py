@@ -12,6 +12,7 @@ from ..cooperative.pg import GDmax as GDMax, LGDmax
 from ..cooperative.pg import MAPolicyNetwork, NGDmax, SoftmaxPolicy
 from ..cooperative.pg_parallel import GDmax as PGDMax
 from ..cooperative.ppo import advPPO
+from ..cooperative.lambda_pg import NLGDmax
 from ..utils.env import MultiGridWrapper, PettingZooWrapper
 
 # ray.init()
@@ -188,6 +189,7 @@ def lgdmax_grid_experiment():
         while True:
             team_action, _ = team.get_actions(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            adv_action = adv_action.item()
             # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action
@@ -197,4 +199,33 @@ def lgdmax_grid_experiment():
             if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                 break
 
+def nlgdmax_grid_experiment():
+    gdm = NLGDmax(15, 4, [(i,j) for i in range(4) for j in range(4)], env=lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)))
+
+    for i in range(100):
+        x = time()
+        gdm.step() # 4
+        print(f"iteration {i} done in {time() - x}s")
+    
+    team = gdm.team_policy
+    torch.save(team.state_dict(), f"3x3-team-policy-final-nlambda.pt")
+    adv = gdm.adv_policy
+    torch.save(adv.state_dict(), f"3x3-adv-policy-final-nlambda.pt")
+
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    for episode in range(100):
+        obs, _ = env.reset()
+        env.render()
+        while True:
+            team_action, _ = team.get_actions(obs[0])
+            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            adv_action = adv_action.item()
+            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            action = {i: team_action[i] for i in range(len(team_action))}
+            action[len(action)] = adv_action
+            obs, reward, trunc, done, _ = env.step(action)
+            print(action, reward)
+            sleep(0.5)
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
 
