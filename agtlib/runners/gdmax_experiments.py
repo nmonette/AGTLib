@@ -8,7 +8,7 @@ import numpy as np
 
 from ..cooperative.base import PolicyNetwork
 from ..cooperative.pg import GDmax, LGDmax
-from ..cooperative.pg import MAPolicyNetwork
+from ..cooperative.pg import MAPolicyNetwork, SoftmaxPolicy
 from ..cooperative.lambda_pg import NLGDmax, TwoHeadPolicy
 from ..utils.env import MultiGridWrapper
 
@@ -19,11 +19,11 @@ def grid_experiment_3x3(env1):
     # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
     # gdm = PGDMax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10, lr=0.1)
 
-    gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50, lr=0.1)
+    gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
     time_taken_sum = 0
     # gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
     time_taken_sum = 0
-    iterations = 100
+    iterations = 10
     for i in range(iterations):
         x = time()
         gdm.step() # 4
@@ -41,19 +41,12 @@ def grid_experiment_3x3(env1):
     adv = gdm.adv_policy
     torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy-final.pt")
 
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    plt.xlabel("Iterations")
+    plt.ylabel("Nash Gap")
+    plt.title("Nash Gap in TAMG")
+    plt.plot(gdm.nash_gap)
 
-    fig.suptitle("GDMax with Adversarial TMG")
-    ax1.set_title("Adversary Mean Episode Rewards")
-    ax1.set_xlabel("Iterations")
-    ax1.set_ylabel("Mean Reward")
-    ax1.plot(gdm.episode_avg_adv_rewards)
-    ax2.set_title("Team Mean Episode Rewards")
-    ax2.set_xlabel("Iterations")
-    ax2.set_ylabel("Mean Reward")
-    ax2.plot(gdm.episode_avg_team_rewards)
-
-    fig.savefig("gdmax_experiment_rewards.png")
+    plt.savefig("gdmax_experiment_nashgap.png")
     
     """
     ppo = advPPO(4, 15, 3)
@@ -82,7 +75,8 @@ def grid_experiment_3x3(env1):
     adv = ppo.adv_ppo.policy
     
     """
-    team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) # SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 2, 4])
+    # team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
+    team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01)
     adv = PolicyNetwork(15, 4)
 
     team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy-final.pt"))

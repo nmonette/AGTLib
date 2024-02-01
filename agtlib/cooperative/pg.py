@@ -40,7 +40,7 @@ class SoftmaxPolicy(nn.Module):
     def step(self, loss):
         loss.backward(inputs=(self.params,)) # inputs=(self.params,)
 
-        x = self.params - self.lr * self.params.grad
+        x = self.params + self.lr * self.params.grad
         self.params.grad.zero_()
         self.params.data = nn.Softmax()(x)
 
@@ -121,19 +121,31 @@ class GDmax:
         
         self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
+        self.param_dims = param_dims
         if param_dims is not None:
-            self.team_policy = SoftmaxPolicy(2, 4, param_dims) 
+            self.team_policy = SoftmaxPolicy(2, 4, param_dims, lr, [(i,j) for i in range(self.action_size) for j in range(self.action_size)]) 
 
-        self.episode_avg_adv_rewards = []
-        self.adv_loss = []
-        self.episode_avg_team_rewards = []
+        self.nash_gap = []
 
-    def rollout(self, adversary=True):
+    def get_team_gap(self):
+        temp_team = SoftmaxPolicy(self.team_size, self.action_size, self.param_dims, self.lr, [(i,j) for i in range(self.action_size) for j in range(self.action_size)])
+        temp_team.load_state_dict(self.team_policy.state_dict())
+
+        for i in range(100):
+            team_loss = self.rollout(adversary=False, team_policy=temp_team) 
+            self.team_policy.step(team_loss)
+
+        return self.get_utility(team_policy=temp_team, calc_logs=False)[1]
+
+    def rollout(self, adversary=True, team_policy=None):
         """
         Rollout to calculate loss
         """
         log_probs = []
         rewards = []
+
+        if team_policy is None:
+            team_policy = self.team_policy
 
         env = self.env # ()
         for episode in range(self.n_rollouts):
@@ -141,7 +153,7 @@ class GDmax:
             ep_log_probs = []
             ep_rewards = []
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                team_action, team_log_prob = team_policy.get_actions(obs[0])
                 action = {}
                 for i in range(self.team_size):
                     action[i] = team_action[i]
@@ -163,17 +175,20 @@ class GDmax:
 
         return self.calculate_loss(log_probs, rewards)
         
-    def get_utility(self, calc_logs=True):
+    def get_utility(self, team_policy=None, calc_logs=True):
         """
         Finds utility with both strategies fixed, averaged across 
         """
+        if team_policy is None:
+            team_policy = self.team_policy
+
         for episode in range(self.n_rollouts):
             obs, _ = self.env.reset()
             log_prob_rewards = []
             rewards = []
 
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                team_action, team_log_prob = team_policy.get_actions(obs[0])
                 action = {}
                 
                 for i in range(self.team_size):
@@ -196,9 +211,6 @@ class GDmax:
                 return avg_utility
             else:
                 return -torch.mean(torch.tensor(rewards).float()).item(), torch.mean(torch.tensor(rewards).float()).item()
-        
-            
-
 
     def calculate_loss(self, log_probs, rewards):
         left = []
@@ -219,6 +231,25 @@ class GDmax:
 
         return torch.mean(disc_reward * log_probs)
 
+    def step_with_gap(self):
+        base_adv, base_team = self.get_utility(calc_logs=False)
+
+        for _ in range(self.n_rollouts * 2): # self.num_steps
+            total_loss = self.rollout()
+
+            self.adv_optimizer.zero_grad()
+            total_loss.backward()
+            self.adv_optimizer.step()
+
+        _, gap_team = self.get_utility(calc_logs=False)
+            
+        team_loss = self.rollout(adversary=False) 
+        self.team_policy.step(team_loss)
+
+        gap_adv = self.get_team_gap()
+
+        self.nash_gap.append(max(gap_adv - base_adv, gap_team - base_team))
+
     def step(self):
         for _ in range(self.n_rollouts * 2): # self.num_steps
             total_loss = self.rollout()
@@ -226,14 +257,9 @@ class GDmax:
             self.adv_optimizer.zero_grad()
             total_loss.backward()
             self.adv_optimizer.step()
-            
-        team_loss = self.rollout(adversary=False) # ray.get(self.rollout.remote(self, adversary=False))
-        
-        self.team_policy.step(team_loss)
-        adv_utility, team_utility = self.get_utility(calc_logs=False)
 
-        self.episode_avg_adv_rewards.append(adv_utility)
-        self.episode_avg_team_rewards.append(team_utility)
+        team_loss = self.rollout(adversary=False) 
+        self.team_policy.step(team_loss)
 
 class NGDmax(GDmax):
     """
