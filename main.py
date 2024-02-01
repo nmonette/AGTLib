@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
     # test_lgdmax_weights()
-    nlgdmax_grid_experiment()
+    # nlgdmax_grid_experiment()
     # 5 actions, 5 states
     # generate_reward_3x3()
     # print(torch.einsum("ij,jk->jik ", lambda_, x).reshape((S,A**3)))
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     # MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     
-    # grid_experiment_3x3(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
+    grid_experiment_3x3(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     # SubprocVecEnv([lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))])
     # ippo = IPPO(4, 15, 3)
     # ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", agents=3)), n_envs = 32, n_updates=1000, rollout_length=100)
