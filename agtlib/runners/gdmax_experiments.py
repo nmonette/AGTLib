@@ -22,12 +22,15 @@ def grid_experiment_3x3(env1):
     gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50, lr=0.1)
     time_taken_sum = 0
     # gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
-    for i in range(100):
+    time_taken_sum = 0
+    iterations = 100
+    for i in range(iterations):
         x = time()
         gdm.step() # 4
-        print(f"Iteration {i} done in {time() - x}s\t", end="")
+        print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
         time_taken_sum += time() - x
-        print("Estimated time remaining: ", (10000 - i) * (time_taken_sum / (i+1)))
+        time_remaining = (iterations - i) * (time_taken_sum / (i+1))
+        print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
         if i % 1000 == 0:
             team = gdm.team_policy
             torch.save(team.state_dict(), f"{dim}x{dim}-team-policy-step{i+1}.pt")
@@ -228,12 +231,13 @@ def nlgdmax_grid_experiment():
         torch.save(adv.state_dict(), "output/" + str(iteration) + "-3x3-adv-policy-final-nlambda.pt")
 
     time_taken_sum = 0
-    for i in range(100):
+    iterations = 100
+    for i in range(iterations):
         x = time()
         gdm.step() # 4
         print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
         time_taken_sum += time() - x
-        time_remaining = (10000 - i) * (time_taken_sum / (i+1))
+        time_remaining = (iterations - i) * (time_taken_sum / (i+1))
         print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
         
         if i % 500 == 0:
