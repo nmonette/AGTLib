@@ -1,2 +1,8 @@
 *.pt
 *.npy
+
+*.pt
+__pycache__/
+*.py[cod]
+*$py.class
+.tool-versions
