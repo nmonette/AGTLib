@@ -243,22 +243,25 @@ def nlgdmax_grid_experiment():
             
     save()
 
-    # env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
-    # for episode in range(100):
-    #     obs, _ = env.reset()
-    #     env.render()
-    #     while True:
-    #         team_action, _ = team.get_actions(obs[0])
-    #         adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
-    #         adv_action = adv_action.item()
-    #         # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
-    #         action = {i: team_action[i] for i in range(len(team_action))}
-    #         action[len(action)] = adv_action
-    #         obs, reward, trunc, done, _ = env.step(action)
-    #         print(action, reward)
-    #         sleep(0.5)
-    #         if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
-    #             break
+    team = gdm.team_policy
+    adv = gdm.adv_policy
+
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    for episode in range(100):
+        obs, _ = env.reset()
+        env.render()
+        while True:
+            team_action, _ = team.get_actions(obs[0])
+            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            adv_action = adv_action.item()
+            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            action = {i: team_action[i] for i in range(len(team_action))}
+            action[len(action)] = adv_action
+            obs, reward, trunc, done, _ = env.step(action)
+            print(action, reward)
+            sleep(0.5)
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
 
 def test_lgdmax_weights():
     team = MAPolicyNetwork(15, 4*4, [(i,j) for i in range(4) for j in range(4)])
