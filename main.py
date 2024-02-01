@@ -15,7 +15,7 @@ from gymnasium import register
 import multigrid
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import IPPO, PPO
-from agtlib.runners.gdmax_experiments import grid_experiment_3x3, lgdmax_grid_experiment, nlgdmax_grid_experiment# ,mpe_experiment
+from agtlib.runners.gdmax_experiments import grid_experiment_3x3, lgdmax_grid_experiment, nlgdmax_grid_experiment, test_lgdmax_weights# ,mpe_experiment
 from agtlib.utils.env import (MultiGridWrapper, SingleAgentEnvWrapper,
                               generate_reward)
 from agtlib.utils.rollout import RolloutManager
@@ -30,6 +30,7 @@ from treasure_hunt import TeamEmptyEnv
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
+    # test_lgdmax_weights()
     nlgdmax_grid_experiment()
     # 5 actions, 5 states
     # generate_reward_3x3()

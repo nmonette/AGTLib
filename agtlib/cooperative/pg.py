@@ -120,7 +120,7 @@ class GDmax:
         self.num_steps = n_rollouts * 10
         
         self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
-        self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr)
+        self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
         if param_dims is not None:
             self.team_policy = SoftmaxPolicy(2, 4, param_dims) 
 
@@ -217,7 +217,7 @@ class GDmax:
         disc_reward = torch.tensor(left)
         log_probs = torch.stack(right)
 
-        return -torch.mean(disc_reward * log_probs)
+        return torch.mean(disc_reward * log_probs)
 
     def step(self):
         for _ in range(self.n_rollouts * 2): # self.num_steps

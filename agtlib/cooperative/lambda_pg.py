@@ -135,7 +135,7 @@ class NLGDmax:
 
         self.lambda_optimizer = torch.optim.Adam(self.lambda_network.parameters(), lr=lr)
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr)
-        self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr)
+        self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
 
         # Metric for tracking progress
         self.reward = []
@@ -211,7 +211,7 @@ class NLGDmax:
         disc_reward = torch.tensor(left)
         log_probs = torch.stack(right)
 
-        return -torch.mean(disc_reward * log_probs)
+        return torch.mean(disc_reward * log_probs) # -torch.mean(disc_reward * log_probs) trying to remove (-) and seeing what happens
 
     def rollout(self):
         """
@@ -225,6 +225,7 @@ class NLGDmax:
             obs, _ = env.reset()
             ep_log_probs = []
             ep_rewards = []
+            gamma = 1
             while True:
                 team_action, team_log_prob = self.team_policy.get_actions(obs[0])
                 action = {}
@@ -236,6 +237,7 @@ class NLGDmax:
                 
                 ep_log_probs.append(torch.sum(team_log_prob))
                 ep_rewards.append(reward[0])
+                self.gamma *= 1
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                     break # >= 2 comes from 2 terminal states in treasure hunt
@@ -250,17 +252,11 @@ class NLGDmax:
         for i in range(self.rollout_length):
             self.adv_optimizer.zero_grad()
             policy_features = self.adv_policy.forward_init(init_data[i])
-            loss = -torch.dot(self.lambda_network.forward(policy_features), reward_vec[i])
+            loss = torch.dot(self.lambda_network.forward(policy_features), reward_vec[i])
             loss.backward()
             self.adv_optimizer.step()
             
-            self.team_optimizer.zero_grad()
-            team_loss = self.rollout()
-            team_loss.backward()
-            self.team_optimizer.step()
-
-        
-            
-        
-        
-        
+        self.team_optimizer.zero_grad()
+        team_loss = self.rollout()
+        team_loss.backward()
+        self.team_optimizer.step()

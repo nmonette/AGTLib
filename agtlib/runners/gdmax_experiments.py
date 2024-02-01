@@ -12,7 +12,7 @@ from ..cooperative.pg import GDmax as GDMax, LGDmax
 from ..cooperative.pg import MAPolicyNetwork, NGDmax, SoftmaxPolicy
 from ..cooperative.pg_parallel import GDmax as PGDMax
 from ..cooperative.ppo import advPPO
-from ..cooperative.lambda_pg import NLGDmax
+from ..cooperative.lambda_pg import NLGDmax, TwoHeadPolicy
 from ..utils.env import MultiGridWrapper, PettingZooWrapper
 
 # ray.init()
@@ -21,9 +21,9 @@ def grid_experiment_3x3(env1):
     dim = 3
     # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
     # gdm = PGDMax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10, lr=0.1)
-    # gdm = GDMax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50, lr=0.1)
-    gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
-    for i in range(10000):
+    gdm = GDMax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4,4], n_rollouts=50, lr=0.1)
+    # gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
+    for i in range(100):
         x = time()
         gdm.step() # 4
         print(f"iteration {i} done in {time() - x}s")
@@ -200,9 +200,9 @@ def lgdmax_grid_experiment():
                 break
 
 def nlgdmax_grid_experiment():
-    gdm = NLGDmax(15, 4, [(i,j) for i in range(4) for j in range(4)], env=lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)),lr=0.01)
+    gdm = NLGDmax(15, 4, [(i,j) for i in range(4) for j in range(4)], env=lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)),lr=0.1)
 
-    for i in range(1000):
+    for i in range(100):
         x = time()
         gdm.step() # 4
         print(f"iteration {i} done in {time() - x}s")
@@ -243,3 +243,25 @@ def nlgdmax_grid_experiment():
             if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                 break
 
+def test_lgdmax_weights():
+    team = MAPolicyNetwork(15, 4*4, [(i,j) for i in range(4) for j in range(4)])
+    adv = TwoHeadPolicy(15, 4, fm_dim1=64, fm_dim2=128)
+
+    team.load_state_dict(torch.load(f"3x3-team-policy-final-nlambda.pt"))
+    adv.load_state_dict(torch.load(f"3x3-adv-policy-final-nlambda.pt"))
+
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    for episode in range(100):
+        obs, _ = env.reset()
+        env.render()
+        while True:
+            team_action, _ = team.get_actions(obs[0])
+            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            adv_action = adv_action.item()
+            action = {i: team_action[i] for i in range(len(team_action))}
+            action[len(action)] = adv_action
+            obs, reward, trunc, done, _ = env.step(action)
+            print(action, reward)
+            sleep(0.5)
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
