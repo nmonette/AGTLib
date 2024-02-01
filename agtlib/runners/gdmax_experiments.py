@@ -7,26 +7,48 @@ import numpy as np
 # from pettingzoo.mpe import simple_adversary_v3
 
 from ..cooperative.base import PolicyNetwork
-from ..cooperative.pg import GDmax, LGDmax
+from ..cooperative.pg import GDmax, LGDmax, NGDmax
 from ..cooperative.pg import MAPolicyNetwork, SoftmaxPolicy
 from ..cooperative.lambda_pg import NLGDmax, TwoHeadPolicy
 from ..utils.env import MultiGridWrapper
 
 # ray.init()
 
-def grid_experiment_3x3(env1):
+def ngdmax_experiment():
     dim = 3
-    # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
-    # gdm = PGDMax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=10, lr=0.1)
-
-    gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
+    gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
     time_taken_sum = 0
-    # gdm = NGDmax(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
-    time_taken_sum = 0
-    iterations = 10
+    iterations = 100
     for i in range(iterations):
         x = time()
         gdm.step() # 4
+        print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
+        time_taken_sum += time() - x
+        time_remaining = (iterations - i) * (time_taken_sum / (i+1))
+        print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
+        if i % 1000 == 0:
+            team = gdm.team_policy
+            torch.save(team.state_dict(), f"{dim}x{dim}-team-policy-step{i+1}.pt")
+            adv = gdm.adv_policy
+            torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy-step{i+1}.pt")
+
+    team = gdm.team_policy
+    torch.save(team.state_dict(), f"{dim}x{dim}-team-policy-final.pt")
+    adv = gdm.adv_policy
+    torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy-final.pt")
+
+def gdmax_experiment():
+    dim = 3
+    gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
+    time_taken_sum = 0
+    time_taken_sum = 0
+    iterations = 100
+    for i in range(iterations):
+        x = time()
+        if i % 5 == 0:
+            gdm.step_with_gap()
+        else:
+            gdm.step() # 4
         print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
         time_taken_sum += time() - x
         time_remaining = (iterations - i) * (time_taken_sum / (i+1))
@@ -48,33 +70,6 @@ def grid_experiment_3x3(env1):
 
     plt.savefig("gdmax_experiment_nashgap.png")
     
-    """
-    ppo = advPPO(4, 15, 3)
-    
-    def make_env():
-        return MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12))
-
-    for i in range(10):
-        x = time()
-        ppo.step(make_env, n_envs=4)
-        print(f"iteration {i} done in {time() - x}s")
-
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-
-    fig.suptitle("PPO with Adversarial TMG")
-    ax1.set_title("Adversary Mean Episode Rewards")
-    ax1.set_xlabel("Iterations")
-    ax1.set_ylabel("Mean Reward")
-    ax1.plot(ppo.episode_avg_adv_rewards)
-    ax2.set_title("Team Mean Episode Rewards")
-    ax2.set_xlabel("Iterations")
-    ax2.set_ylabel("Mean Reward")
-    ax2.plot(ppo.episode_avg_team_rewards)
-
-    team = ppo.team_ppo.policy
-    adv = ppo.adv_ppo.policy
-    
-    """
     # team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
     team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01)
     adv = PolicyNetwork(15, 4)
