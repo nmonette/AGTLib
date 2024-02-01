@@ -138,7 +138,8 @@ class NLGDmax:
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
 
         # Metric for tracking progress
-        self.reward = []
+        self.team_rewards = []
+        self.adv_rewards = []
     
     def find_lambda(self):
         obs_data = []
@@ -176,7 +177,7 @@ class NLGDmax:
             obs_data.append(lambda_)
             reward_data.append(reward_vec)
 
-            self.reward.append(sum(rewards) / len(rewards))
+            self.team_rewards.append(sum(rewards) / len(rewards))
 
         lambda_data = torch.stack(obs_data)
         init_data = torch.stack(init_obs)
@@ -225,6 +226,7 @@ class NLGDmax:
             obs, _ = env.reset()
             ep_log_probs = []
             ep_rewards = []
+            adv_rewards = []
             gamma = 1
             while True:
                 team_action, team_log_prob = self.team_policy.get_actions(obs[0])
@@ -237,6 +239,7 @@ class NLGDmax:
                 
                 ep_log_probs.append(torch.sum(team_log_prob))
                 ep_rewards.append(reward[0])
+                adv_rewards.append(reward[len(reward)-1])
                 self.gamma *= 1
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
@@ -244,6 +247,7 @@ class NLGDmax:
             
             log_probs.append(ep_log_probs)
             rewards.append(ep_rewards)
+            self.adv_rewards.append(torch.mean(torch.tensor(adv_rewards, dtype=float)).item())
 
         return self.calculate_loss(log_probs, rewards)
     

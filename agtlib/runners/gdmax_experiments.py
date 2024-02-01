@@ -211,19 +211,19 @@ def nlgdmax_grid_experiment():
     os.makedirs("output", exist_ok=True)
 
     def save(iteration="end"):
-        fig, (ax1, ax2) = plt.subplots(1, 2)
+        # fig, (ax1, ax2) = plt.subplots(1, 2)
 
-        fig.suptitle("NLGDmax with Adversarial TMG")
-        ax1.set_title("Adversary Mean Episode Rewards")
-        ax1.set_xlabel("Iterations")
-        ax1.set_ylabel("Mean Reward")
-        ax1.plot([-i for i in gdm.reward])
-        ax2.set_title("Team Mean Episode Rewards")
-        ax2.set_xlabel("Iterations")
-        ax2.set_ylabel("Mean Reward")
-        ax2.plot(gdm.reward)
+        # fig.suptitle("NLGDmax with Adversarial TMG")
+        # ax1.set_title("Adversary Mean Episode Rewards")
+        # ax1.set_xlabel("Iterations")
+        # ax1.set_ylabel("Mean Reward")
+        # ax1.plot([-i for i in gdm.reward])
+        # ax2.set_title("Team Mean Episode Rewards")
+        # ax2.set_xlabel("Iterations")
+        # ax2.set_ylabel("Mean Reward")
+        # ax2.plot(gdm.reward)
 
-        fig.savefig("output/" + str(iteration) + "-lgdmax_experiment_rewards.png")
+        # fig.savefig("output/" + str(iteration) + "-lgdmax_experiment_rewards.png")
         
         team = gdm.team_policy
         torch.save(team.state_dict(), "output/" + str(iteration) + "-3x3-team-policy-final-nlambda.pt")
@@ -231,10 +231,15 @@ def nlgdmax_grid_experiment():
         torch.save(adv.state_dict(), "output/" + str(iteration) + "-3x3-adv-policy-final-nlambda.pt")
 
     time_taken_sum = 0
-    iterations = 100
+    iterations = 10000
+    nash_gap = []
     for i in range(iterations):
         x = time()
         gdm.step() # 4
+        nash_gap.append(torch.max(torch.tensor(gdm.adv_rewards) - torch.tensor(gdm.team_rewards)).item())
+        gdm.adv_rewards = []
+        gdm.team_rewards = []
+        
         print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
         time_taken_sum += time() - x
         time_remaining = (iterations - i) * (time_taken_sum / (i+1))
@@ -247,6 +252,11 @@ def nlgdmax_grid_experiment():
             
     save()
 
+    plt.xlabel("Iterations")
+    plt.ylabel("Nash Gap")
+    plt.plot(nash_gap)
+    plt.savefig("gdmax_experiment_rewards.png")
+
     team = gdm.team_policy
     adv = gdm.adv_policy
 
@@ -258,7 +268,6 @@ def nlgdmax_grid_experiment():
             team_action, _ = team.get_actions(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
-            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
