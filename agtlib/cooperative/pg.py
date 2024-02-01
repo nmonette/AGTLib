@@ -232,7 +232,7 @@ class GDmax:
         return torch.mean(disc_reward * log_probs)
 
     def step_with_gap(self):
-        base_adv, base_team = self.get_utility(calc_logs=False)
+        _, base_team = self.get_utility(calc_logs=False)
 
         for _ in range(self.n_rollouts * 2): # self.num_steps
             total_loss = self.rollout()
@@ -240,11 +240,11 @@ class GDmax:
             self.adv_optimizer.zero_grad()
             total_loss.backward()
             self.adv_optimizer.step()
-
-        _, gap_team = self.get_utility(calc_logs=False)
             
         team_loss = self.rollout(adversary=False) 
         self.team_policy.step(team_loss)
+
+        base_adv, gap_team = self.get_utility(calc_logs=False)
 
         gap_adv = self.get_team_gap()
 
