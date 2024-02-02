@@ -8,11 +8,75 @@ import numpy as np
 
 from ..cooperative.base import PolicyNetwork
 from ..cooperative.pg import GDmax, LGDmax, NGDmax
+from ..cooperative.reinforce import GDmax as REINFORCE
 from ..cooperative.pg import MAPolicyNetwork, SoftmaxPolicy
 from ..cooperative.lambda_pg import NLGDmax, TwoHeadPolicy
 from ..utils.env import MultiGridWrapper
 
 # ray.init()
+
+def reinforce_experiment():
+    def save(iteration="end"):
+        plt.xlabel("Iterations")
+        plt.ylabel("Nash Gap")
+        plt.plot(gdm.nash_gap)
+        plt.savefig("output/" + str(iteration) + "-lgdmax_experiment_rewards.png")
+        
+        team = gdm.team_policy
+        torch.save(team.state_dict(), "output/" + str(iteration) + "-3x3-team-policy-nlambda.pt")
+        adv = gdm.adv_policy
+        torch.save(adv.state_dict(), "output/" + str(iteration) + "-3x3-adv-policy-nlambda.pt")
+    
+    dim = 3
+    gdm = REINFORCE(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], rollout_length=50, lr=0.01)
+    time_taken_sum = 0
+    time_taken_sum = 0
+    iterations = 100
+    for i in range(iterations):
+        x = time()
+        gdm.step()
+        if i % 20 == 0:
+            gdm.step_with_gap()
+            print("Nash Gap:", gdm.nash_gap[-1])
+        else:
+            gdm.step() # 4
+
+        print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
+        time_taken_sum += time() - x
+        time_remaining = (iterations - i) * (time_taken_sum / (i+1))
+        print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
+        if i % 500 == 0:
+            # Save progress
+            print("Saving progress...")
+            save(i)
+            
+    save()
+    
+    # team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
+    # team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01, [(i,j) for i in range(4) for j in range(4)])
+    # adv = PolicyNetwork(15, 4)
+
+    # team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy-final.pt"))
+    # adv.load_state_dict(torch.load(f"{dim}x{dim}-adv-policy-final.pt"))
+
+    team = gdm.team_policy
+    adv = gdm.adv_policy
+    
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    for episode in range(100):
+        obs, _ = env.reset()
+        env.render()
+        while True:
+            team_action, _ = team.get_actions(obs[0])
+            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            action = {i: team_action[i] for i in range(len(team_action))}
+            action[len(action)] = adv_action
+            obs, reward, trunc, done, _ = env.step(action)
+            print(action, reward)
+            sleep(0.5)
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
 
 def ngdmax_experiment():
     dim = 3
@@ -56,6 +120,7 @@ def gdmax_experiment():
     iterations = 10000
     for i in range(iterations):
         x = time()
+        gdm.step()
         if i % 20 == 0:
             gdm.step_with_gap()
             print("Nash Gap:", gdm.nash_gap[-1])

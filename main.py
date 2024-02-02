@@ -15,7 +15,7 @@ from gymnasium import register
 import multigrid
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import IPPO, PPO
-from agtlib.runners.gdmax_experiments import ngdmax_experiment, lgdmax_grid_experiment, nlgdmax_grid_experiment, test_lgdmax_weights, gdmax_experiment# ,mpe_experiment
+from agtlib.runners.gdmax_experiments import ngdmax_experiment, lgdmax_grid_experiment, nlgdmax_grid_experiment, test_lgdmax_weights, gdmax_experiment, reinforce_experiment# ,mpe_experiment
 from agtlib.utils.env import (MultiGridWrapper, SingleAgentEnvWrapper,
                               generate_reward)
 from agtlib.utils.rollout import RolloutManager
@@ -31,6 +31,7 @@ warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
     # test_lgdmax_weights()
+    reinforce_experiment()
     # nlgdmax_grid_experiment()
     # 5 actions, 5 states
     # generate_reward_3x3()
@@ -61,7 +62,7 @@ if __name__ == "__main__":
 
     # MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))
     
-    gdmax_experiment()
+    # gdmax_experiment()
     # SubprocVecEnv([lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3))])
     # ippo = IPPO(4, 15, 3)
     # ippo.train(lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-8x8-Team", agents=3)), n_envs = 32, n_updates=1000, rollout_length=100)
