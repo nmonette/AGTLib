@@ -56,6 +56,7 @@ def gdmax_experiment():
     iterations = 100
     for i in range(iterations):
         x = time()
+        gdm.step()
         if i % 20 == 0:
             gdm.step_with_gap()
         else:

@@ -56,18 +56,23 @@ class Grid:
 
         
     def handle_actions(self, actions) -> np.ndarray:
+        if len(actions) != self.num_agents_t1 + self.num_agents_t2:
+            raise ValueError("Too many or not enough actions passed in")
+        if self.num_steps >= self.max_episode_steps:
+            raise RuntimeError("Environment needs to be reset")
+        
         self.num_steps += 1
         rewards = {i:0 for i in range(self.num_agents_t1 + self.num_agents_t2 )}
-        for i in range(len(actions)):
+        for i in range(self.num_agents_t1 + self.num_agents_t2):
             if self.terminations[i]:
                 continue
 
             # Hacky-ish, should improve
             locations = self.agent_locations_t1 if i < self.num_agents_t1 else self.agent_locations_t2
+            team = i < self.num_agents_t1 # True if team 1 else False
             if i >= self.num_agents_t1:
                 i -= self.num_agents_t1
 
-            team = i < self.num_agents_t1 # True if team 1 else False
             x,y = locations[i]
             if actions[i] == UP and y < self.dim - 1:locations[i] = (x, y+1)
             elif actions[i] == DOWN and y > 0:
@@ -78,28 +83,28 @@ class Grid:
                 locations[i] = (x+1,y)
             else:
                 # invalid action
-                continue
+                pass
 
             reward = 1 # can be changed if reward should be changed (e.g. discounted based on number of steps)
-            if locations[i] == self.goal_locations[0]:
+            if locations[i] == self.goal_locations[0] and not self.goal1_terminated:
                 self.terminations[i] = True
                 self.goal1_terminated = True
-                for i in range(self.num_agents_t1):
-                    rewards[i] += reward * (1 if team else 1)
-                for i in range(self.num_agents_t1, self.num_agents_t2):
-                    rewards[i] += reward * (-1 if team else 1)
-            elif locations[i] == self.goal_locations[1]:
+                for j in range(self.num_agents_t1):
+                    rewards[j] += reward * (1 if team else -1)
+                for j in range(self.num_agents_t1, self.num_agents_t1 + self.num_agents_t2):
+                    rewards[j] += reward * (-1 if team else 1)
+            elif locations[i] == self.goal_locations[1] and not self.goal2_terminated:
                 self.terminations[i] = True
                 self.goal2_terminated = True
-                for i in range(self.num_agents_t1):
-                    rewards[i] += reward * (1 if team else 1)
-                for i in range(self.num_agents_t1, self.num_agents_t2):
-                    rewards[i] += reward * (-1 if team else 1)
+                for j in range(self.num_agents_t1):
+                    rewards[j] += reward * (1 if team else -1)
+                for j in range(self.num_agents_t1, self.num_agents_t1 + self.num_agents_t2):
+                    rewards[j] += reward * (-1 if team else 1)
             else:
-                continue
+                pass
 
             if (self.goal1_terminated and self.goal2_terminated) or self.num_steps >= self.max_episode_steps:
-                self.done = {i:True for i in range(self.num_agents_t1+self.num_agents_t2)}
+                self.done = {j:True for j in range(self.num_agents_t1+self.num_agents_t2)}
 
         return rewards, self.terminations, self.done
         
