@@ -71,7 +71,7 @@ def gdmax_experiment():
     plt.savefig("gdmax_experiment_nashgap.png")
     
     # team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
-    team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01)
+    team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01, [(i,j) for i in range(4) for j in range(4)])
     adv = PolicyNetwork(15, 4)
 
     team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy-final.pt"))
@@ -215,7 +215,7 @@ def nlgdmax_grid_experiment():
     nash_gap = []
     for i in range(iterations):
         x = time()
-        if i % 5 == 0:
+        if i % 20 == 0:
             gdm.step_with_gap()
         else:
             gdm.step() 
@@ -231,11 +231,6 @@ def nlgdmax_grid_experiment():
             save(i)
             
     save()
-
-    plt.xlabel("Iterations")
-    plt.ylabel("Nash Gap")
-    plt.plot(gdm.nash_gap)
-    plt.savefig("nlgdmax_experiment_nashgap.png")
 
     team = gdm.team_policy
     adv = gdm.adv_policy
