@@ -53,11 +53,12 @@ def gdmax_experiment():
     gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
     time_taken_sum = 0
     time_taken_sum = 0
-    iterations = 100
+    iterations = 10000
     for i in range(iterations):
         x = time()
         if i % 20 == 0:
             gdm.step_with_gap()
+            print("Nash Gap:", gdm.nash_gap[-1])
         else:
             gdm.step() # 4
 
@@ -73,12 +74,14 @@ def gdmax_experiment():
     save()
     
     # team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
-    team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01, [(i,j) for i in range(4) for j in range(4)])
-    adv = PolicyNetwork(15, 4)
+    # team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01, [(i,j) for i in range(4) for j in range(4)])
+    # adv = PolicyNetwork(15, 4)
 
-    team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy-final.pt"))
-    adv.load_state_dict(torch.load(f"{dim}x{dim}-adv-policy-final.pt"))
+    # team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy-final.pt"))
+    # adv.load_state_dict(torch.load(f"{dim}x{dim}-adv-policy-final.pt"))
 
+    team = gdm.team_policy
+    adv = gdm.adv_policy
     
     env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
     for episode in range(100):

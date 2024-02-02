@@ -26,6 +26,7 @@ class SoftmaxPolicy(nn.Module):
         
 
     def forward(self, x):
+        # [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16]
         return self.params[*x, :]
 
     def get_actions(self, x):
