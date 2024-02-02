@@ -15,7 +15,7 @@ from gymnasium import register
 import multigrid
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import IPPO, PPO
-from agtlib.runners.gdmax_experiments import ngdmax_experiment, lgdmax_grid_experiment, nlgdmax_grid_experiment, test_lgdmax_weight, gdmax_experiment# ,mpe_experiment
+from agtlib.runners.gdmax_experiments import ngdmax_experiment, lgdmax_grid_experiment, nlgdmax_grid_experiment, test_lgdmax_weights, gdmax_experiment# ,mpe_experiment
 from agtlib.utils.env import (MultiGridWrapper, SingleAgentEnvWrapper,
                               generate_reward)
 from agtlib.utils.rollout import RolloutManager

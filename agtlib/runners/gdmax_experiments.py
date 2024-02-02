@@ -42,7 +42,7 @@ def gdmax_experiment():
     gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
     time_taken_sum = 0
     time_taken_sum = 0
-    iterations = 100
+    iterations = 10
     for i in range(iterations):
         x = time()
         if i % 5 == 0:

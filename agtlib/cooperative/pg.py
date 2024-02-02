@@ -127,15 +127,15 @@ class GDmax:
 
         self.nash_gap = []
 
-    def get_team_gap(self):
+    def get_adv_gap(self):
         temp_team = SoftmaxPolicy(self.team_size, self.action_size, self.param_dims, self.lr, [(i,j) for i in range(self.action_size) for j in range(self.action_size)])
         temp_team.load_state_dict(self.team_policy.state_dict())
 
-        for i in range(100):
+        for i in range(self.n_rollouts * 2):
             team_loss = self.rollout(adversary=False, team_policy=temp_team) 
-            self.team_policy.step(team_loss)
+            temp_team.step(team_loss)
 
-        return self.get_utility(team_policy=temp_team, calc_logs=False)[1]
+        return self.get_utility(team_policy=temp_team, calc_logs=False)[0]
 
     def rollout(self, adversary=True, team_policy=None):
         """
@@ -232,7 +232,8 @@ class GDmax:
         return torch.mean(disc_reward * log_probs)
 
     def step_with_gap(self):
-        _, base_team = self.get_utility(calc_logs=False)
+        base_adv, base_team = self.get_utility(calc_logs=False)
+        gap_adv = self.get_adv_gap()
 
         for _ in range(self.n_rollouts * 2): # self.num_steps
             total_loss = self.rollout()
@@ -240,13 +241,11 @@ class GDmax:
             self.adv_optimizer.zero_grad()
             total_loss.backward()
             self.adv_optimizer.step()
-            
+
+        gap_team = self.get_utility(calc_logs=False)[1]
+
         team_loss = self.rollout(adversary=False) 
         self.team_policy.step(team_loss)
-
-        base_adv, gap_team = self.get_utility(calc_logs=False)
-
-        gap_adv = self.get_team_gap()
 
         self.nash_gap.append(max(gap_adv - base_adv, gap_team - base_team))
 
