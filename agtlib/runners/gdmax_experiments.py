@@ -39,13 +39,13 @@ def ngdmax_experiment():
 
 def gdmax_experiment():
     dim = 3
-    gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.1)
+    gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
     time_taken_sum = 0
     time_taken_sum = 0
-    iterations = 10
+    iterations = 100
     for i in range(iterations):
         x = time()
-        if i % 5 == 0:
+        if i % 20 == 0:
             gdm.step_with_gap()
         else:
             gdm.step() # 4
@@ -193,26 +193,17 @@ def lgdmax_grid_experiment():
                 break
 
 def nlgdmax_grid_experiment():
-    gdm = NLGDmax(15, 4, [(i,j) for i in range(4) for j in range(4)], env=lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)),lr=0.1)
+    gdm = NLGDmax(15, 4, [(i,j) for i in range(4) for j in range(4)], env=lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, size=5, max_episode_steps=12)),lr=0.01)
 
     # mkdir -p output
     import os
     os.makedirs("output", exist_ok=True)
 
     def save(iteration="end"):
-        # fig, (ax1, ax2) = plt.subplots(1, 2)
-
-        # fig.suptitle("NLGDmax with Adversarial TMG")
-        # ax1.set_title("Adversary Mean Episode Rewards")
-        # ax1.set_xlabel("Iterations")
-        # ax1.set_ylabel("Mean Reward")
-        # ax1.plot([-i for i in gdm.reward])
-        # ax2.set_title("Team Mean Episode Rewards")
-        # ax2.set_xlabel("Iterations")
-        # ax2.set_ylabel("Mean Reward")
-        # ax2.plot(gdm.reward)
-
-        # fig.savefig("output/" + str(iteration) + "-lgdmax_experiment_rewards.png")
+        plt.xlabel("Iterations")
+        plt.ylabel("Nash Gap")
+        plt.plot(gdm.nash_gap)
+        plt.savefig("output/" + str(iteration) + "-lgdmax_experiment_rewards.png")
         
         team = gdm.team_policy
         torch.save(team.state_dict(), "output/" + str(iteration) + "-3x3-team-policy-final-nlambda.pt")
@@ -224,10 +215,10 @@ def nlgdmax_grid_experiment():
     nash_gap = []
     for i in range(iterations):
         x = time()
-        gdm.step() # 4
-        nash_gap.append(torch.max(torch.tensor(gdm.adv_rewards) - torch.tensor(gdm.team_rewards)).item())
-        gdm.adv_rewards = []
-        gdm.team_rewards = []
+        if i % 5 == 0:
+            gdm.step_with_gap()
+        else:
+            gdm.step() 
         
         print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
         time_taken_sum += time() - x
@@ -243,8 +234,8 @@ def nlgdmax_grid_experiment():
 
     plt.xlabel("Iterations")
     plt.ylabel("Nash Gap")
-    plt.plot(nash_gap)
-    plt.savefig("gdmax_experiment_rewards.png")
+    plt.plot(gdm.nash_gap)
+    plt.savefig("nlgdmax_experiment_nashgap.png")
 
     team = gdm.team_policy
     adv = gdm.adv_policy

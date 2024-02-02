@@ -134,12 +134,11 @@ class NLGDmax:
         self.adv_policy = TwoHeadPolicy(obs_size, action_size, fm_dim1=fm_dim1, fm_dim2=fm_dim2)
 
         self.lambda_optimizer = torch.optim.Adam(self.lambda_network.parameters(), lr=lr)
-        self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr)
+        self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
 
         # Metric for tracking progress
-        self.team_rewards = []
-        self.adv_rewards = []
+        self.nash_gap = []
     
     def find_lambda(self):
         obs_data = []
@@ -161,8 +160,6 @@ class NLGDmax:
                 action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[len(obs)-1]).float())
                 obs, reward, done, trunc, _ = self.env.step(action) 
 
-                rewards.append(reward[0])
-
                 obs_features = self.adv_policy.state_action_mapping(torch.tensor(obs[len(obs)-1]).float(), action[len(action)-1])
                 reward_features = self.adv_policy.reward_mapping(torch.tensor(obs[len(obs)-1]).float(), action[len(action)-1], torch.tensor(reward[len(reward)-1]).reshape(1))
 
@@ -176,8 +173,6 @@ class NLGDmax:
 
             obs_data.append(lambda_)
             reward_data.append(reward_vec)
-
-            self.team_rewards.append(sum(rewards) / len(rewards))
 
         lambda_data = torch.stack(obs_data)
         init_data = torch.stack(init_obs)
@@ -214,12 +209,15 @@ class NLGDmax:
 
         return torch.mean(disc_reward * log_probs) # -torch.mean(disc_reward * log_probs) trying to remove (-) and seeing what happens
 
-    def rollout(self):
+    def rollout(self, team_policy = None):
         """
         Rollout to calculate loss
         """
         log_probs = []
         rewards = []
+
+        if team_policy is None:
+            team_policy = self.team_policy
 
         env = self.env # ()
         for episode in range(self.rollout_length):
@@ -229,7 +227,7 @@ class NLGDmax:
             adv_rewards = []
             gamma = 1
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                team_action, team_log_prob = team_policy.get_actions(obs[0])
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
@@ -247,9 +245,72 @@ class NLGDmax:
             
             log_probs.append(ep_log_probs)
             rewards.append(ep_rewards)
-            self.adv_rewards.append(torch.mean(torch.tensor(adv_rewards, dtype=float)).item())
 
         return self.calculate_loss(log_probs, rewards)
+    
+    def get_utility(self, team_policy=None):
+        """
+        Finds utility with both strategies fixed, averaged across 
+        """
+        if team_policy is None:
+            team_policy = self.team_policy
+
+        for episode in range(self.rollout_length):
+            obs, _ = self.env.reset()
+            log_prob_rewards = []
+            rewards = []
+
+            while True:
+                team_action, team_log_prob = team_policy.get_actions(obs[0])
+                action = {}
+                
+                for i in range(len(team_action)):
+                    action[i] = team_action[i]
+                action[i+1], adv_log_prob = self.adv_policy.get_action(torch.tensor(obs[len(obs) - 1]).float())
+                action[i+1] = action[i+1].item()
+                obs, reward, done, trunc, _ = self.env.step(action) 
+                
+                rewards.append(reward[0])
+
+                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    break # >= 2 comes from 2 terminal states in treasure hunt
+
+            return -torch.mean(torch.tensor(rewards).float()).item(), torch.mean(torch.tensor(rewards).float()).item()
+   
+    def get_adv_gap(self):
+        temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, hl_dims=[64,128], action_map=self.action_map)
+        temp_team.load_state_dict(self.team_policy.state_dict())
+        temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
+
+        for i in range(self.rollout_length * 2):
+            temp_optimizer.zero_grad()
+            team_loss = self.rollout(team_policy=temp_team)
+            team_loss.backward() 
+            temp_optimizer.step()
+
+        return self.get_utility(team_policy=temp_team)[0]
+    
+    def step_with_gap(self):
+        reward_vec, init_data = self.find_lambda()
+
+        base_adv, base_team = self.get_utility()
+        gap_adv = self.get_adv_gap()
+
+        for i in range(self.rollout_length):
+            self.adv_optimizer.zero_grad()
+            policy_features = self.adv_policy.forward_init(init_data[i])
+            loss = torch.dot(self.lambda_network.forward(policy_features), reward_vec[i])
+            loss.backward()
+            self.adv_optimizer.step()
+
+        gap_team = self.get_utility()[1]
+            
+        self.team_optimizer.zero_grad()
+        team_loss = self.rollout()
+        team_loss.backward()
+        self.team_optimizer.step()
+
+        self.nash_gap.append(max(gap_adv - base_adv, gap_team - base_team))
     
     def step(self):
         reward_vec, init_data = self.find_lambda()
