@@ -38,6 +38,17 @@ def ngdmax_experiment():
     torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy-final.pt")
 
 def gdmax_experiment():
+    def save(iteration="end"):
+        plt.xlabel("Iterations")
+        plt.ylabel("Nash Gap")
+        plt.plot(gdm.nash_gap)
+        plt.savefig("output/" + str(iteration) + "-lgdmax_experiment_rewards.png")
+        
+        team = gdm.team_policy
+        torch.save(team.state_dict(), "output/" + str(iteration) + "-3x3-team-policy-nlambda.pt")
+        adv = gdm.adv_policy
+        torch.save(adv.state_dict(), "output/" + str(iteration) + "-3x3-adv-policy-nlambda.pt")
+    
     dim = 3
     gdm = GDmax(15,4, lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], n_rollouts=50, lr=0.01)
     time_taken_sum = 0
@@ -49,26 +60,17 @@ def gdmax_experiment():
             gdm.step_with_gap()
         else:
             gdm.step() # 4
+
         print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
         time_taken_sum += time() - x
         time_remaining = (iterations - i) * (time_taken_sum / (i+1))
         print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
-        if i % 1000 == 0:
-            team = gdm.team_policy
-            torch.save(team.state_dict(), f"{dim}x{dim}-team-policy-step{i+1}.pt")
-            adv = gdm.adv_policy
-            torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy-step{i+1}.pt")
-    team = gdm.team_policy
-    torch.save(team.state_dict(), f"{dim}x{dim}-team-policy-final.pt")
-    adv = gdm.adv_policy
-    torch.save(adv.state_dict(), f"{dim}x{dim}-adv-policy-final.pt")
-
-    plt.xlabel("Iterations")
-    plt.ylabel("Nash Gap")
-    plt.title("Nash Gap in TAMG")
-    plt.plot(gdm.nash_gap)
-
-    plt.savefig("gdmax_experiment_nashgap.png")
+        if i % 500 == 0:
+            # Save progress
+            print("Saving progress...")
+            save(i)
+            
+    save()
     
     # team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
     team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01, [(i,j) for i in range(4) for j in range(4)])
@@ -206,9 +208,9 @@ def nlgdmax_grid_experiment():
         plt.savefig("output/" + str(iteration) + "-lgdmax_experiment_rewards.png")
         
         team = gdm.team_policy
-        torch.save(team.state_dict(), "output/" + str(iteration) + "-3x3-team-policy-final-nlambda.pt")
+        torch.save(team.state_dict(), "output/" + str(iteration) + "-3x3-team-policy-nlambda.pt")
         adv = gdm.adv_policy
-        torch.save(adv.state_dict(), "output/" + str(iteration) + "-3x3-adv-policy-final-nlambda.pt")
+        torch.save(adv.state_dict(), "output/" + str(iteration) + "-3x3-adv-policy-nlambda.pt")
 
     time_taken_sum = 0
     iterations = 10000
@@ -217,6 +219,7 @@ def nlgdmax_grid_experiment():
         x = time()
         if i % 20 == 0:
             gdm.step_with_gap()
+            print("Nash Gap:", gdm.nash_gap[-1])
         else:
             gdm.step() 
         
