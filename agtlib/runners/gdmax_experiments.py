@@ -86,10 +86,10 @@ def n_reinforce_experiment():
     gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)), rollout_length=1000, lr=0.001)
     time_taken_sum = 0
     time_taken_sum = 0
-    iterations = 100
+    iterations = 1000
     for i in range(iterations):
         x = time()
-        if i % 10 == 0:
+        if i %50 == 0:
             gdm.step_with_gap()
             print("Nash Gap:", gdm.nash_gap[-1])
         else:
