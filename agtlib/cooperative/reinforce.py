@@ -129,7 +129,7 @@ class NGDmax(GDmax):
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
         self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
-        self.adv_policy.load_state_dict(torch.load("PATH"))
+        self.team_policy.load_state_dict(torch.load("PATH"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
 
     def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None):
