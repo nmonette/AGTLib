@@ -14,6 +14,7 @@ class GDmax:
         self.rollout_length = rollout_length
         
         self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
+        self.adv_policy.load_state_dict(torch.load("PATH"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
         self.param_dims = param_dims
         if param_dims is not None:
@@ -58,7 +59,7 @@ class GDmax:
         loss = torch.dot(log_probs, returns)
 
         if adversary:
-            self.adv_optimizer.zero_grad()
+            self.adv_optimizer.zero_grad(set_to_none=True)
             loss.backward()
             self.adv_optimizer.step()
 
@@ -127,8 +128,8 @@ class NGDmax(GDmax):
 
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
-
         self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
+        self.adv_policy.load_state_dict(torch.load("PATH"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
 
     def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None):
@@ -177,12 +178,11 @@ class NGDmax(GDmax):
         loss = torch.dot(log_probs, returns)
 
         if adversary:
-            adv_optimizer.zero_grad()
+            adv_optimizer.zero_grad(set_to_none=True)
             loss.backward()
             adv_optimizer.step()
-
         else:
-            team_optimizer.zero_grad()
+            team_optimizer.zero_grad(set_to_none=True)
             loss.backward()
             team_optimizer.step()
 
