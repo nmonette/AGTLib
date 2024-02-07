@@ -29,12 +29,6 @@ from treasure_hunt import TeamEmptyEnv
 
 warnings.filterwarnings("ignore")
 
-if torch.backends.mps.is_available():
-    torch.set_default_device("mps")
-    print("mps")
-else:
-    print("no mps")
-
 if __name__ == "__main__":
     # test_lgdmax_weights()
     # test_reinforce()
