@@ -216,4 +216,11 @@ class NGDmax(GDmax):
         
         self.update(adversary=False)
 
-        self.nash_gap.append(abs(self.get_adv_br().item() + self.get_team_br().item()))
+        adv_base, team_base = self.get_utility()
+
+        self.nash_gap.append(max(self.get_adv_br().item() - adv_base.item(), self.get_team_br().item() - team_base.item()))
+
+        # team plays some x, assume adversary plays best response, then print utility of team when adversary is giving best response
+
+        # one treasure in top right, one treasure in bottom left, other two corners put the team, put the adversary in the center
+        # make it so 
