@@ -13,7 +13,7 @@ class GDmax:
         self.gamma = gamma
         self.rollout_length = rollout_length
         
-        self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims).to("cpu")
+        self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims).to("mps")
         # self.adv_policy.load_state_dict(torch.load("PATH"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
         self.param_dims = param_dims
@@ -78,8 +78,8 @@ class GDmax:
             env = self.env
             obs, _ = env.reset()
             while True:
-                team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+                team_obs = torch.tensor(obs[0], device="mps", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
                 team_action, team_log_prob = team_policy.get_actions(team_obs)
                 action = {}
                 for i in range(len(team_action)):
@@ -130,7 +130,7 @@ class NGDmax(GDmax):
 
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, batch_size:int =32):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
-        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]).to("cpu")
+        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]).to("mps")
         # self.team_policy.load_state_dict(torch.load("PATH"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
 
@@ -161,8 +161,8 @@ class NGDmax(GDmax):
             rewards = []
             obs, _ = env.reset()
             while True:
-                team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+                team_obs = torch.tensor(obs[0], device="mps", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
                 team_action, team_log_prob = team_policy.get_actions(team_obs)
                 action = {}
                 for i in range(len(team_action)):
@@ -185,7 +185,7 @@ class NGDmax(GDmax):
                 returns.append(self.gamma * returns[-1] + rewards[-i])
 
             log_probs_t = torch.stack(log_probs)
-            returns_t = torch.tensor(returns, dtype=torch.float32, device="cpu").flip(-1)
+            returns_t = torch.tensor(returns, dtype=torch.float32, device="mps").flip(-1)
 
             data.append((log_probs_t, returns_t))
             # losses.append(torch.dot(log_probs_t, returns_t))
@@ -204,7 +204,7 @@ class NGDmax(GDmax):
                     team_optimizer.step()
 
     def get_team_br(self):
-        temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128]).to("cpu")
+        temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128]).to("mps")
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=True)
 
@@ -214,7 +214,7 @@ class NGDmax(GDmax):
         return self.get_utility(adv_policy=None)[0]
 
     def get_adv_br(self):
-        temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128]).to("cpu")
+        temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128]).to("mps")
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
 
