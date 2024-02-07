@@ -47,8 +47,8 @@ def test_n_reinforce():
     team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
     adv = PolicyNetwork(15, 4)
 
-    team.load_state_dict(torch.load("./output/end-3x3-team-policy-n-reinforce.pt"))
-    adv.load_state_dict(torch.load("./output/end-3x3-adv-policy-n-reinforce.pt"))
+    team.load_state_dict(torch.load("./output/experiment-10/3000-3x3-team-policy-n-reinforce.pt"))
+    adv.load_state_dict(torch.load("./output/experiment-10/3000-3x3-adv-policy-n-reinforce.pt"))
     
     env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
     for episode in range(100):
@@ -58,7 +58,6 @@ def test_n_reinforce():
             team_action, _ = team.get_actions(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
-            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
@@ -86,7 +85,7 @@ def n_reinforce_experiment():
     gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)), rollout_length=1000, lr=0.001)
     time_taken_sum = 0
     time_taken_sum = 0
-    iterations = 1000
+    iterations = 50000
     for i in range(iterations):
         x = time()
         if i %50 == 0:
