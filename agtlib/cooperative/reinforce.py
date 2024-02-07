@@ -214,4 +214,4 @@ class NGDmax(GDmax):
 
         adv_base, team_base = self.get_utility()
 
-        self.nash_gap.append(max(self.get_adv_br().item() - adv_base, self.get_team_br().item() - team_base))
+        self.nash_gap.append(max(self.get_adv_br().item() - adv_base.item(), self.get_team_br().item() - team_base.item()))
