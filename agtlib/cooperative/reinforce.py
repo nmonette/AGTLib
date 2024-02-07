@@ -212,4 +212,6 @@ class NGDmax(GDmax):
         
         self.update(adversary=False)
 
-        self.nash_gap.append(abs(self.get_adv_br().item() + self.get_team_br().item()))
+        adv_base, team_base = self.get_utility()
+
+        self.nash_gap.append(max(self.get_adv_br - adv_base, self.get_team_br - team_base))
