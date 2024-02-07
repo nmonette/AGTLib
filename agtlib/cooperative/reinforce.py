@@ -78,11 +78,13 @@ class GDmax:
             env = self.env
             obs, _ = env.reset()
             while True:
-                team_action, team_log_prob = team_policy.get_actions(obs[0])
+                team_obs = torch.tensor(obs[0], device="mps", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
+                team_action, team_log_prob = team_policy.get_actions(team_obs)
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
-                action[i+1], adv_log_prob = adv_policy.get_action(torch.tensor(obs[len(obs) - 1]).float())
+                action[i+1], adv_log_prob = adv_policy.get_action(adv_obs)
                 action[i+1] = action[i+1].item()
                 
                 obs, reward, done, trunc, _ = env.step(action)
@@ -151,11 +153,13 @@ class NGDmax(GDmax):
         env = self.env
         obs, _ = env.reset()
         while True:
-            team_action, team_log_prob = team_policy.get_actions(obs[0])
+            team_obs = torch.tensor(obs[0], device="mps", dtype=torch.float32)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
+            team_action, team_log_prob = team_policy.get_actions(team_obs)
             action = {}
             for i in range(len(team_action)):
                 action[i] = team_action[i]
-            action[i+1], adv_log_prob = adv_policy.get_action(torch.tensor(obs[len(obs) - 1]).float())
+            action[i+1], adv_log_prob = adv_policy.get_action(adv_obs)
             action[i+1] = action[i+1].item()
             obs, reward, done, trunc, _ = env.step(action) 
             if adversary:
