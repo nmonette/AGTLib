@@ -137,8 +137,8 @@ class NGDmax(GDmax):
         self.batch_size = batch_size
 
     def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
-        losses = []
-        data = []
+        log_prob_data = []
+        returns_data = []
 
         if rollout_length is None:
             rollout_length = self.rollout_length
@@ -187,21 +187,22 @@ class NGDmax(GDmax):
             log_probs_t = torch.stack(log_probs)
             returns_t = torch.tensor(returns, dtype=torch.float32, device="mps").flip(-1)
 
-            data.append((log_probs_t, returns_t))
-            # losses.append(torch.dot(log_probs_t, returns_t))
-
-        for batch in range(0, len(losses), self.batch_size):
-            data_batch = data[batch:batch+self.batch_size]
-            for data in data_batch:
-                loss = torch.dot(*data)
-                if adversary:
-                    adv_optimizer.zero_grad(set_to_none=True)
-                    loss.backward()
-                    adv_optimizer.step()
-                else:
-                    team_optimizer.zero_grad(set_to_none=True)
-                    loss.backward()
-                    team_optimizer.step()
+            # data.append((log_probs_t, returns_t))
+            log_prob_data.append(log_probs_t)
+            returns_data.append(returns_t)
+    
+        for batch in range(0, len(log_prob_data), self.batch_size):
+            log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size])
+            returns = torch.stack(log_prob_data[batch:batch+self.batch_size])
+            loss = torch.dot(log_probs, returns)
+            if adversary:
+                adv_optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                adv_optimizer.step()
+            else:
+                team_optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                team_optimizer.step()
 
     def get_team_br(self):
         temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128]).to("mps")
