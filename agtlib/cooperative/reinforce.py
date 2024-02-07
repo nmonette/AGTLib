@@ -208,8 +208,7 @@ class NGDmax(GDmax):
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=True)
 
-        for i in range(self.rollout_length):
-            self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
+        self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
 
         return self.get_utility(adv_policy=None)[0]
 
@@ -218,8 +217,7 @@ class NGDmax(GDmax):
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
 
-        for i in range(self.rollout_length):
-            self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
+        self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
 
         return self.get_utility(team_policy=temp_team)[1]
 
