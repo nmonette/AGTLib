@@ -222,10 +222,14 @@ class NGDmax(GDmax):
             self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
 
         return self.get_utility(team_policy=temp_team)[1]
+
+    def step(self):
+        self.update()
+
+        self.update(adversary=False, rollout_length=1)
     
     def step_with_gap(self):
-        for i in range(self.rollout_length):
-            self.update()
+        self.update()
         
         self.update(adversary=False, rollout_length=1)
 
