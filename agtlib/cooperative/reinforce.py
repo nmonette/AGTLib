@@ -155,9 +155,11 @@ class NGDmax(GDmax):
         if adv_optimizer is None:
             adv_optimizer = self.adv_optimizer
 
+        log_probs = []
+        return_data = []
+
         env = self.env
         for episode in range(rollout_length):
-            log_probs = []
             rewards = []
             obs, _ = env.reset()
             while True:
@@ -184,17 +186,16 @@ class NGDmax(GDmax):
             for i in range(2, len(rewards)+1):
                 returns.append(self.gamma * returns[-1] + rewards[-i])
 
-            log_probs_t = torch.stack(log_probs)
-            returns_t = torch.tensor(returns, dtype=torch.float32, device="mps").flip(-1)
+            return_data.extend(returns)
 
-            # data.append((log_probs_t, returns_t))
-            log_prob_data.append(log_probs_t)
-            returns_data.append(returns_t)
+        perm  = torch.randperm(len(log_probs))
+        log_probs = torch.stack(log_probs)[perm]
+        returns = torch.tensor(return_data, device="mps")[perm]
     
         for batch in range(0, len(log_prob_data), self.batch_size):
-            log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size])
-            returns = torch.stack(log_prob_data[batch:batch+self.batch_size])
-            loss = torch.dot(log_probs, returns)
+            batch_log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size])
+            batch_returns = torch.stack(return_data[batch:batch+self.batch_size])
+            loss = torch.dot(batch_log_probs, batch_returns)
             if adversary:
                 adv_optimizer.zero_grad(set_to_none=True)
                 loss.backward()
