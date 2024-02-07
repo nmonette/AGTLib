@@ -13,7 +13,7 @@ class GDmax:
         self.gamma = gamma
         self.rollout_length = rollout_length
         
-        self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
+        self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims).to("mps")
         # self.adv_policy.load_state_dict(torch.load("PATH"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
         self.param_dims = param_dims
@@ -93,7 +93,7 @@ class GDmax:
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                     break
         
-        return -torch.mean(torch.tensor(team_rewards), dtype=float), torch.mean(torch.tensor(team_rewards, dtype=float))
+        return -torch.mean(torch.tensor(team_rewards), dtype=torch.float32), torch.mean(torch.tensor(team_rewards, dtype=torch.float32))
     
     def get_adv_gap(self):
         temp_team = SoftmaxPolicy(2, self.action_size, self.param_dims, self.lr, [(i,j) for i in range(self.action_size) for j in range(self.action_size)])
@@ -128,7 +128,7 @@ class NGDmax(GDmax):
 
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
-        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
+        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]).to("mps")
         # self.team_policy.load_state_dict(torch.load("PATH"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
 
@@ -187,7 +187,7 @@ class NGDmax(GDmax):
             team_optimizer.step()
 
     def get_team_br(self):
-        temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128])
+        temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128]).to("mps")
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=True)
 
@@ -197,7 +197,7 @@ class NGDmax(GDmax):
         return self.get_utility(adv_policy=None)[0]
 
     def get_adv_br(self):
-        temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128])
+        temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128]).to("mps")
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
 
