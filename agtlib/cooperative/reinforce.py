@@ -177,7 +177,7 @@ class NGDmax(GDmax):
             returns.append(self.gamma * returns[-1] + rewards[-i])
 
         log_probs = torch.stack(log_probs)
-        returns = torch.tensor(returns, dtype=torch.float32).flip(-1)
+        returns = torch.tensor(returns, dtype=torch.float32, device="mps").flip(-1)
 
         loss = torch.dot(log_probs, returns)
 
