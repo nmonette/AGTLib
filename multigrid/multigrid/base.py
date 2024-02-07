@@ -1018,6 +1018,9 @@ class TeamMultiGridEnv(MultiGridEnv):
         self.goals -= 1
         if self.goals == 0:
             self.agent_states.terminated = True # terminate all agents
+
+        if winner:
+            self.agent_states.terminated = True
         
     def step(
     self,

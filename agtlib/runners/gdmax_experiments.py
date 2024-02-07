@@ -47,8 +47,8 @@ def test_n_reinforce():
     team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
     adv = PolicyNetwork(15, 4)
 
-    team.load_state_dict(torch.load("./output/experiment-10/3000-3x3-team-policy-n-reinforce.pt"))
-    adv.load_state_dict(torch.load("./output/experiment-10/3000-3x3-adv-policy-n-reinforce.pt"))
+    team.load_state_dict(torch.load("./output/experiment-2/end-3x3-team-policy-n-reinforce.pt"))
+    adv.load_state_dict(torch.load("./output/experiment-2/end-3x3-adv-policy-n-reinforce.pt"))
     
     env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
     for episode in range(100):
