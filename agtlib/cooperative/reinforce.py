@@ -13,7 +13,7 @@ class GDmax:
         self.gamma = gamma
         self.rollout_length = rollout_length
         
-        self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims).to("mps")
+        self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims).to("cpu")
         # self.adv_policy.load_state_dict(torch.load("PATH"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
         self.param_dims = param_dims
@@ -78,8 +78,8 @@ class GDmax:
             env = self.env
             obs, _ = env.reset()
             while True:
-                team_obs = torch.tensor(obs[0], device="mps", dtype=torch.float32)
-                adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
+                team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
                 team_action, team_log_prob = team_policy.get_actions(team_obs)
                 action = {}
                 for i in range(len(team_action)):
@@ -128,15 +128,20 @@ class GDmax:
 
 class NGDmax(GDmax):
 
-    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
+    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, batch_size:int =32):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
-        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]).to("mps")
+        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]).to("cpu")
         # self.team_policy.load_state_dict(torch.load("PATH"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
 
-    def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None):
-        log_probs = []
-        rewards = []
+        self.batch_size = batch_size
+
+    def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
+        losses = []
+        data = []
+
+        if rollout_length is None:
+            rollout_length = self.rollout_length
 
         if team_policy is None:
             team_policy = self.team_policy
@@ -151,47 +156,55 @@ class NGDmax(GDmax):
             adv_optimizer = self.adv_optimizer
 
         env = self.env
-        obs, _ = env.reset()
-        while True:
-            team_obs = torch.tensor(obs[0], device="mps", dtype=torch.float32)
-            adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
-            team_action, team_log_prob = team_policy.get_actions(team_obs)
-            action = {}
-            for i in range(len(team_action)):
-                action[i] = team_action[i]
-            action[i+1], adv_log_prob = adv_policy.get_action(adv_obs)
-            action[i+1] = action[i+1].item()
-            obs, reward, done, trunc, _ = env.step(action) 
-            if adversary:
-                log_probs.append(adv_log_prob)
-                rewards.append(reward[len(reward) - 1])
-            else:
-                log_probs.append(team_log_prob)
-                rewards.append(reward[0])
+        for episode in range(rollout_length):
+            log_probs = []
+            rewards = []
+            obs, _ = env.reset()
+            while True:
+                team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+                team_action, team_log_prob = team_policy.get_actions(team_obs)
+                action = {}
+                for i in range(len(team_action)):
+                    action[i] = team_action[i]
+                action[i+1], adv_log_prob = adv_policy.get_action(adv_obs)
+                action[i+1] = action[i+1].item()
+                obs, reward, done, trunc, _ = env.step(action) 
+                if adversary:
+                    log_probs.append(adv_log_prob)
+                    rewards.append(reward[len(reward) - 1])
+                else:
+                    log_probs.append(team_log_prob)
+                    rewards.append(reward[0])
 
-            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
-                break
+                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    break
 
-        returns = [rewards[-1]]
-        for i in range(2, len(rewards)+1):
-            returns.append(self.gamma * returns[-1] + rewards[-i])
+            returns = [rewards[-1]]
+            for i in range(2, len(rewards)+1):
+                returns.append(self.gamma * returns[-1] + rewards[-i])
 
-        log_probs = torch.stack(log_probs)
-        returns = torch.tensor(returns, dtype=torch.float32, device="mps").flip(-1)
+            log_probs_t = torch.stack(log_probs)
+            returns_t = torch.tensor(returns, dtype=torch.float32, device="cpu").flip(-1)
 
-        loss = torch.dot(log_probs, returns)
+            data.append((log_probs_t, returns_t))
+            # losses.append(torch.dot(log_probs_t, returns_t))
 
-        if adversary:
-            adv_optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            adv_optimizer.step()
-        else:
-            team_optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            team_optimizer.step()
+        for batch in range(0, len(losses), self.batch_size):
+            data_batch = data[batch:batch+self.batch_size]
+            for data in data_batch:
+                loss = torch.dot(*data)
+                if adversary:
+                    adv_optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    adv_optimizer.step()
+                else:
+                    team_optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    team_optimizer.step()
 
     def get_team_br(self):
-        temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128]).to("mps")
+        temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128]).to("cpu")
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=True)
 
@@ -201,7 +214,7 @@ class NGDmax(GDmax):
         return self.get_utility(adv_policy=None)[0]
 
     def get_adv_br(self):
-        temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128]).to("mps")
+        temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128]).to("cpu")
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
 
@@ -214,7 +227,7 @@ class NGDmax(GDmax):
         for i in range(self.rollout_length):
             self.update()
         
-        self.update(adversary=False)
+        self.update(adversary=False, rollout_length=1)
 
         adv_base, team_base = self.get_utility()
 
