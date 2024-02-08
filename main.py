@@ -32,7 +32,7 @@ warnings.filterwarnings("ignore")
 if __name__ == "__main__":
     # test_lgdmax_weights()
     # test_reinforce()
-    n_reinforce_experiment()
+    test_n_reinforce()
     # test_n_reinforce()
     # reinforce_experiment()
     # nlgdmax_grid_experiment()

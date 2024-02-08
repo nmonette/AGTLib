@@ -248,4 +248,49 @@ class TeamEmptyEnv(TeamMultiGridEnv):
             else:
                 self.place_agent(agent)
 
+
+class TeamWins(TeamEmptyEnv):
+     def _gen_grid(self, width, height):
+        """
+        :meta private:
+        """
+        # Generating all coordinates of the grid
+        # coords = [(i,j) for i in range(1,width-1) for j in range(1,height-1)]
+        # shuffle(coords)
+        # Create an empty grid
+        self.grid = Grid(width, height)
+
+        # Generate the surrounding walls
+        self.grid.wall_rect(0, 0, width, height)
+        
+        # Place a goal square in the bottom-right corner
+        # self.goal1 = coords.pop()
+        # self.goal2 = coords.pop()
+
+        self.goal1 = (1,1)
+        self.goal2 = (width-2, height-2)
+        self.put_obj(Goal(), *self.goal1)
+        self.put_obj(Goal(), *self.goal2)
+
+        self.goal1_terminated = False
+        self.goal2_terminated = False
+
+        self.agent_start_pos = (1,1)
+        self.agent_start_dir = (1,1) 
+
+        self.allow_agent_overlap = True
+
+        # Place the agent
+        for agent in self.agents:
+            # Setting team colors
+            if agent.index == 0:
+                agent.state.color = "blue"
+                agent.state.pos = (width-2, 1)
+            elif agent.index == 1:
+                agent.state.color = "blue"
+                agent.state.pos = (1, height-2)
+            else:       
+                agent.state.color = "red"
+                agent.state.pos =  (width-3, height-3)
+                agent.state.dir = 1
             
