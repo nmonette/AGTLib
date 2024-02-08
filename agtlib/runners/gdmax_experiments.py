@@ -72,8 +72,14 @@ def n_reinforce_experiment():
     def save(iteration="end"):
         plt.xlabel("Iterations")
         plt.ylabel("Nash Gap")
-        plt.plot(gdm.nash_gap)
-        plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment_rewards.png")
+        plt.plot(range(0, len(gdm.nash_gap), 50), gdm.nash_gap)
+        plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-nashgap.png")
+        plt.close
+
+        plt.xlabel("Iterations")
+        plt.ylabel("Team Utility against ADV BR")
+        plt.plot(range(0, len(gdm.nash_gap), 50), gdm.team_utility)
+        plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-team-rewards.png")
         
         team = gdm.team_policy
         torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-team-policy-n-reinforce.pt")
@@ -83,9 +89,9 @@ def n_reinforce_experiment():
     dim = 3
      # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
     gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)), rollout_length=1000, lr=0.001)
+
     time_taken_sum = 0
-    time_taken_sum = 0
-    iterations = 20000
+    iterations = 50000
     for i in range(iterations):
         x = time()
         if i %50 == 0:
