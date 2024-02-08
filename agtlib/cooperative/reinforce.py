@@ -14,13 +14,14 @@ class GDmax:
         self.rollout_length = rollout_length
         
         self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
-        # self.adv_policy.load_state_dict(torch.load("PATH"))
+        self.adv_policy.load_state_dict(torch.load("PATH"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
         self.param_dims = param_dims
         if param_dims is not None:
             self.team_policy = SoftmaxPolicy(2, 4, param_dims, lr, [(i,j) for i in range(self.action_size) for j in range(self.action_size)]) 
 
         self.nash_gap = []
+        self.team_utility = []
 
     def update(self, adversary=True, team_policy=None):
         log_probs = []
@@ -131,7 +132,7 @@ class NGDmax(GDmax):
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, batch_size:int =32):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
         self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
-        # self.team_policy.load_state_dict(torch.load("PATH"))
+        self.team_policy.load_state_dict(torch.load("PATH"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
 
         self.batch_size = batch_size
@@ -207,16 +208,16 @@ class NGDmax(GDmax):
 
         policy = policy.to("cpu")
 
-    def get_team_br(self):
+    def get_adv_br(self):
         temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128])
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=True)
 
         self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
 
-        return self.get_utility(adv_policy=None)[0]
+        return self.get_utility(adv_policy=None)
 
-    def get_adv_br(self):
+    def get_team_br(self):
         temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128])
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
@@ -237,7 +238,10 @@ class NGDmax(GDmax):
 
         adv_base, team_base = self.get_utility()
 
-        self.nash_gap.append(max(self.get_adv_br().item() - adv_base.item(), self.get_team_br().item() - team_base.item()))
+        adv_br, team_adv_br = self.get_adv_br()
+
+        self.team_utility.append(team_adv_br)
+        self.nash_gap.append(max(adv_br.item()- adv_base.item(), self.get_team_br().item() - team_base.item()))
 
         # team plays some x, assume adversary plays best response, then print utility of team when adversary is giving best response
 
