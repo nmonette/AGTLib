@@ -193,15 +193,15 @@ class NGDmax(GDmax):
         policy = adv_policy if adversary else team_policy
         optimizer = adv_optimizer if adversary else team_optimizer
 
-        policy = policy.to("mps")
+        policy = policy.to("cuda")
 
         for epoch in range(self.epochs):
             perm  = torch.randperm(len(log_probs))
             log_probs = torch.stack(log_probs)[perm]
             returns = torch.tensor(return_data, device="cpu")[perm]
             for batch in range(0, len(log_prob_data), self.batch_size):
-                batch_log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size]).to("mps")
-                batch_returns = torch.stack(return_data[batch:batch+self.batch_size]).to("mps")
+                batch_log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size]).to("cuda")
+                batch_returns = torch.stack(return_data[batch:batch+self.batch_size]).to("cuda")
                 loss = torch.dot(batch_log_probs, batch_returns)
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
