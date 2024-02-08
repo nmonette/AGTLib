@@ -190,16 +190,15 @@ class NGDmax(GDmax):
 
             return_data.extend(returns)
 
-        perm  = torch.randperm(len(log_probs))
-        log_probs = torch.stack(log_probs)[perm]
-        returns = torch.tensor(return_data, device="cpu")[perm]
-
         policy = adv_policy if adversary else team_policy
         optimizer = adv_optimizer if adversary else team_optimizer
 
         policy = policy.to("mps")
 
         for epoch in range(self.epochs):
+            perm  = torch.randperm(len(log_probs))
+            log_probs = torch.stack(log_probs)[perm]
+            returns = torch.tensor(return_data, device="cpu")[perm]
             for batch in range(0, len(log_prob_data), self.batch_size):
                 batch_log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size]).to("mps")
                 batch_returns = torch.stack(return_data[batch:batch+self.batch_size]).to("mps")
