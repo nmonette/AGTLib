@@ -50,7 +50,7 @@ def test_n_reinforce():
     team.load_state_dict(torch.load("./output/phil-experiment/end-3x3-team-policy-n-reinforce.pt"))
     adv.load_state_dict(torch.load("./output/phil-experiment/end-3x3-adv-policy-n-reinforce.pt"))
     
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-TeamWins", agents=3, allow_agent_overlap=True, render_mode="human"))
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, allow_agent_overlap=True, render_mode="human"))
     for episode in range(100):
         obs, _ = env.reset()
         env.render()
@@ -74,7 +74,7 @@ def n_reinforce_experiment():
         plt.ylabel("Nash Gap")
         plt.plot(range(0, len(gdm.nash_gap), 50), gdm.nash_gap)
         plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-nashgap.png")
-        plt.close
+        plt.close()
 
         plt.xlabel("Iterations")
         plt.ylabel("Team Utility against ADV BR")
