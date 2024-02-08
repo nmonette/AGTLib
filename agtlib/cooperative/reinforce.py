@@ -129,13 +129,14 @@ class GDmax:
 
 class NGDmax(GDmax):
 
-    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, batch_size:int =32):
+    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, batch_size:int =32, epochs=100):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
         self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
         self.team_policy.load_state_dict(torch.load("PATH"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
 
         self.batch_size = batch_size
+        self.epochs = epochs
 
     def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
         log_prob_data = []
@@ -198,13 +199,14 @@ class NGDmax(GDmax):
 
         policy = policy.to("mps")
 
-        for batch in range(0, len(log_prob_data), self.batch_size):
-            batch_log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size]).to("mps")
-            batch_returns = torch.stack(return_data[batch:batch+self.batch_size]).to("mps")
-            loss = torch.dot(batch_log_probs, batch_returns)
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
+        for epoch in range(self.epochs):
+            for batch in range(0, len(log_prob_data), self.batch_size):
+                batch_log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size]).to("mps")
+                batch_returns = torch.stack(return_data[batch:batch+self.batch_size]).to("mps")
+                loss = torch.dot(batch_log_probs, batch_returns)
+                optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                optimizer.step()
 
         policy = policy.to("cpu")
 
