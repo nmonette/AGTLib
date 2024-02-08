@@ -14,7 +14,7 @@ class GDmax:
         self.rollout_length = rollout_length
         
         self.adv_policy = PolicyNetwork(obs_size, action_size, hl_dims)
-        self.adv_policy.load_state_dict(torch.load("PATH"))
+        self.adv_policy.load_state_dict(torch.load("./output/phil-experiment/end-3x3-adv-policy-n-reinforce.pt"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
         self.param_dims = param_dims
         if param_dims is not None:
@@ -132,7 +132,7 @@ class NGDmax(GDmax):
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, batch_size:int =32, epochs=100):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
         self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
-        self.team_policy.load_state_dict(torch.load("PATH"))
+        self.team_policy.load_state_dict(torch.load("./output/phil-experiment/end-3x3-team-policy-n-reinforce.pt"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
 
         self.batch_size = batch_size
