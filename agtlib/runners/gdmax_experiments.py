@@ -26,7 +26,7 @@ def test_reinforce():
     team.load_state_dict(torch.load("./output/8000-3x3-team-policy-reinforce.pt"))
     adv.load_state_dict(torch.load("./output/8000-3x3-adv-policy-reinforce.pt"))
     
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human", disable_env_checker=True))
     for episode in range(100):
         obs, _ = env.reset()
         env.render()
@@ -50,7 +50,7 @@ def test_n_reinforce():
     team.load_state_dict(torch.load("./output/experiment-40/end-3x3-team-policy-n-reinforce.pt"))
     adv.load_state_dict(torch.load("./output/experiment-40/end-3x3-adv-policy-n-reinforce.pt"))
     
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-TeamWins", agents=3, allow_agent_overlap=True, render_mode="human"))
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-TeamWins", agents=3, allow_agent_overlap=True, render_mode="human", disable_env_checker=True))
     for episode in range(100):
         obs, _ = env.reset()
         env.render()
@@ -88,15 +88,17 @@ def n_reinforce_experiment():
     
     dim = 3
      # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
-    gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)), rollout_length=1000, lr=0.001, batch_size=512, epochs=50)
+    gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=1000, lr=0.001, batch_size=512, epochs=50)
+
+    PROFILING_MODE = False
 
     time_taken_sum = 0
     iterations = 50000
     for i in range(iterations):
         x = time()
-        if i %50 == 0:
+        if i % 50 == 0 and not PROFILING_MODE:
             gdm.step_with_gap()
-            print("Nash Gap:", gdm.nash_gap[-1])
+            print(f"Nash Gap: {gdm.nash_gap[-1]:.6f}")
         else:
             gdm.step() # 4
 
@@ -104,7 +106,7 @@ def n_reinforce_experiment():
         time_taken_sum += time() - x
         time_remaining = (iterations - i) * (time_taken_sum / (i+1))
         print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
-        if i % 500 == 0:
+        if i % 500 == 0 and not PROFILING_MODE:
             # Save progress
             print("Saving progress...")
             save(i)

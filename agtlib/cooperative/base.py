@@ -38,6 +38,8 @@ class PolicyNetwork(nn.Module):
         for i in range(len(hl_dims)):
             self.layers.append(nn.Linear(prev_dim, hl_dims[i]))
             prev_dim = hl_dims[i]
+
+        self.relu = torch.nn.ReLU()
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -53,7 +55,7 @@ class PolicyNetwork(nn.Module):
             Probability vector containing the action-probabilities.
         """
         for i in range(len(self.layers) - 1):
-            x = torch.nn.ReLU()(self.layers[i](x))
+            x = self.relu(self.layers[i](x))
         return self.layers[-1](x)
 
     def get_action(self, x: torch.Tensor) -> int:
@@ -74,7 +76,7 @@ class PolicyNetwork(nn.Module):
         dist = torch.distributions.Categorical(logits=self.forward(x))
         action = dist.sample()
         log_prob = dist.log_prob(action)
-        
+
         return action, log_prob
 
 

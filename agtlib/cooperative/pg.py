@@ -67,6 +67,7 @@ class MAPolicyNetwork(nn.Module):
             prev_dim = hl_dims[i]
 
         self.action_map = action_map
+        self.relu = torch.nn.ReLU()
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -81,10 +82,10 @@ class MAPolicyNetwork(nn.Module):
         torch.Tensor
             Probability vector containing the action-probabilities.
         """
-        if isinstance(x, np.ndarray):
-            x = torch.tensor(x, dtype=torch.float)
+        # if isinstance(x, np.ndarray):
+        #     x = torch.tensor(x, dtype=torch.float)
         for i in range(len(self.layers) - 1):
-            x = torch.nn.ReLU()(self.layers[i](x))
+            x = self.relu(self.layers[i](x))
         return self.layers[-1](x)
 
     def get_actions(self, x: torch.Tensor) -> int:

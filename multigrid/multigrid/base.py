@@ -214,7 +214,7 @@ class MultiGridEnv(gym.Env, RandomMixin, ABC):
         Return the joint observation space of all agents.
         """
         return spaces.Dict({
-            agent.index: agent.observation_space
+            agent.index: spaces.Discrete(3 * len(self.agents) + 6)
             for agent in self.agents
         })
 
@@ -271,10 +271,12 @@ class MultiGridEnv(gym.Env, RandomMixin, ABC):
         super().reset(seed=seed, **kwargs)
 
         # Reset agents
-        self.mission_space.seed(seed)
-        self.mission = self.mission_space.sample()
-        for agent in self.agents:
-            agent.reset(mission=self.mission)
+        # self.mission_space.seed(seed)
+        # self.mission = self.mission_space.sample()
+        # self.mission = ""
+        # for agent in self.agents:
+        #     pass
+            # agent.reset(mission=self.mission)
 
         # Generate a new random grid at the start of each episode
         self._gen_grid(self.width, self.height)
@@ -1130,10 +1132,11 @@ class TeamMultiGridEnv(MultiGridEnv):
         gym.Env.reset(self, seed=seed, **kwargs)
 
         # Reset agents
-        self.mission_space.seed(seed)
-        self.mission = self.mission_space.sample()
+        # self.mission_space.seed(seed)
+        # self.mission = self.mission_space.sample()
+        self.mission = ""
         for agent in self.agents:
-            agent.reset(mission=self.mission)
+            agent.reset(mission=None)
 
         # Reset goals remaining counter
         self.goals = 2

@@ -8,6 +8,8 @@ from multigrid.core.constants import Direction
 from multigrid.core.world_object import Goal
 from multigrid.utils.obs import gen_obs_grid_encoding
 
+import numpy as np
+
 
 class TeamEmptyEnv(TeamMultiGridEnv):
     """
@@ -169,19 +171,19 @@ class TeamEmptyEnv(TeamMultiGridEnv):
     def gen_obs(self, step=False):
         if step:
             ## Amount of possibilities in NxN is (N^2 - 2)^num_agents * 2^(num_agents + 2)
-            obs = {}
+            obs = np.empty((3 * self.num_agents + 6, ))
             for i in range(self.num_agents):
-                obs[f"{i}_x"] = self.agents[i].pos[0] - 1
-                obs[f"{i}_y"] = self.agents[i].pos[1] - 1
-                obs[f"{i}_terminated"] = int(self.agents[i].terminated)
+                obs[i] = self.agents[i].pos[0] - 1
+                obs[i+1] = self.agents[i].pos[1] - 1
+                obs[i+2] = int(self.agents[i].terminated)
                     
-            obs["goal1_x"] = self.goal1[0] - 1
-            obs["goal1_y"] = self.goal1[1] - 1
-            obs["goal1_terminated"] = int(self.goal1_terminated)
+            obs[i+3] = self.goal1[0] - 1
+            obs[i+4] = self.goal1[1] - 1
+            obs[i+5] = int(self.goal1_terminated)
 
-            obs["goal2_x"] = self.goal2[0] - 1
-            obs["goal2_y"] = self.goal2[1] - 1
-            obs["goal2_terminated"] = int(self.goal2_terminated)
+            obs[i+6] = self.goal2[0] - 1
+            obs[i+7] = self.goal2[1] - 1
+            obs[i+8] = int(self.goal2_terminated)
 
 
             # final = {}
