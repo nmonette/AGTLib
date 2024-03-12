@@ -32,8 +32,9 @@ warnings.filterwarnings("ignore")
 if __name__ == "__main__":
     # test_lgdmax_weights()
     # test_reinforce()
-    test_n_reinforce()
     # test_n_reinforce()
+    # test_n_reinforce()
+    n_reinforce_experiment()
     # reinforce_experiment()
     # nlgdmax_grid_experiment()
     # 5 actions, 5 states
