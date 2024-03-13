@@ -144,9 +144,6 @@ class NGDmax(GDmax):
         self.num_threads = num_threads
 
     def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
-        log_prob_data = []
-        returns_data = []
-
         if rollout_length is None:
             rollout_length = self.rollout_length
 
@@ -196,81 +193,7 @@ class NGDmax(GDmax):
 
             return_data.extend(returns)
 
-        # perm  = torch.randperm(len(log_probs))
-        # log_probs = torch.stack(log_probs)[perm]
-        # returns = torch.tensor(return_data, device="cpu")[perm]
-
-        policy = adv_policy if adversary else team_policy
-        optimizer = adv_optimizer if adversary else team_optimizer
-
-        policy = policy.to("mps")
-
-        for epoch in range(self.epochs):
-            for batch in range(0, len(log_prob_data), self.batch_size):
-                batch_log_probs = torch.stack(log_prob_data[batch:batch+self.batch_size]).to("mps")
-                batch_returns = torch.stack(return_data[batch:batch+self.batch_size]).to("mps")
-                loss = torch.dot(batch_log_probs, batch_returns)
-                optimizer.zero_grad(set_to_none=True)
-                loss.backward()
-                optimizer.step()
-
-        policy = policy.to("cpu")
-
-    def parallel_update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
-        log_prob_data = []
-        returns_data = []
-
-        if rollout_length is None:
-            rollout_length = self.rollout_length
-
-        if team_policy is None:
-            team_policy = self.team_policy
-
-        if team_optimizer is None:
-            team_optimizer = self.team_optimizer
-
-        if adv_policy is None:
-            adv_policy = self.adv_policy
-
-        if adv_optimizer is None:
-            adv_optimizer = self.adv_optimizer
-
-        log_probs = []
-        return_data = []
-
-        env = SubprocVecEnv([self.env for _ in range(self.num_threads)])
-
-        # Main loop
-        obs, _ = env.reset()
-        for seg in range(rollout_length):
-            for t in range(self.seg_length):
-                # Step enviroment using step_async
-                team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-                team_action, team_log_prob = team_policy.get_actions(team_obs)
-                action = {}
-                for i in range(len(team_action)):
-                    action[i] = team_action[i]
-                action[i + 1], adv_log_prob = adv_policy.get_action(adv_obs)
-                action[i + 1] = action[i + 1].item()
-                obs, reward, done, trunc, _ = env.step(action)
-                if adversary:
-                    log_probs.append(adv_log_prob)
-                    rewards.append(reward[len(reward) - 1])
-                else:
-                    log_probs.append(team_log_prob)
-                    rewards.append(reward[0])
-
-                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
-                    break
-
-            returns = [rewards[-1]]
-            for i in range(2, len(rewards) + 1):
-                returns.append(self.gamma * returns[-1] + rewards[-i])
-
-            return_data.extend(returns)
-
-        perm = torch.randperm(len(log_probs))
+        perm  = torch.randperm(len(log_probs))
         log_probs = torch.stack(log_probs)[perm]
         returns = torch.tensor(return_data, device="cpu")[perm]
 
@@ -280,16 +203,15 @@ class NGDmax(GDmax):
         policy = policy.to("mps")
 
         for epoch in range(self.epochs):
-            for batch in range(0, len(log_prob_data), self.batch_size):
-                batch_log_probs = torch.stack(log_probs[batch:batch + self.batch_size]).to("mps")
-                batch_returns = torch.stack(returns[batch:batch + self.batch_size]).to("mps")
+            for batch in range(0, len(log_probs), self.batch_size):
+                batch_log_probs = torch.stack(log_probs[batch:batch+self.batch_size]).to("mps")
+                batch_returns = torch.stack(returns[batch:batch+self.batch_size]).to("mps")
                 loss = torch.dot(batch_log_probs, batch_returns)
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 optimizer.step()
 
         policy = policy.to("cpu")
-
 
     def get_adv_br(self):
         temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128])
