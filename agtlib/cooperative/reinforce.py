@@ -204,8 +204,8 @@ class NGDmax(GDmax):
 
         for epoch in range(self.epochs):
             for batch in range(0, len(log_probs), self.batch_size):
-                batch_log_probs = torch.stack(log_probs[batch:batch+self.batch_size]).to("mps")
-                batch_returns = torch.stack(returns[batch:batch+self.batch_size]).to("mps")
+                batch_log_probs = log_probs[batch:batch+self.batch_size].to("mps")
+                batch_returns = returns[batch:batch+self.batch_size].to("mps")
                 loss = torch.dot(batch_log_probs, batch_returns)
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
