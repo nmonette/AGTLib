@@ -216,7 +216,7 @@ class NGDmax(GDmax):
 
             for batch in range(0, len(return_data), self.batch_size):
                 # batch_log_probs = new_log_probs[batch:batch+self.batch_size] # .to("mps")
-                batch_log_probs = policy.evaluate_actions(new_obs[batch:batch+self.batch_size], new_actions[batch:batch+self.batch_size]).to("mps")
+                batch_log_probs = policy.evaluate_actions(new_obs[batch:batch+self.batch_size].to("mps"), new_actions[batch:batch+self.batch_size].to("mps"))
                 batch_returns = new_returns[batch:batch+self.batch_size].to("mps")
                 loss = torch.dot(batch_log_probs, batch_returns)
                 optimizer.zero_grad(set_to_none=True)
@@ -229,8 +229,9 @@ class NGDmax(GDmax):
         temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128])
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=True)
-
-        self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
+        
+        for i in range(self.br_length):
+            self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
 
         return self.get_utility(adv_policy=None)
 
@@ -239,7 +240,8 @@ class NGDmax(GDmax):
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
 
-        self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
+        for i in range(self.br_length):
+            self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
 
         return self.get_utility(team_policy=temp_team)[1]
 
