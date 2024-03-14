@@ -87,7 +87,7 @@ def n_reinforce_experiment():
         torch.save(adv.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-adv-policy-n-reinforce.pt")
     
     dim = 3
-     # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
+    # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
     gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=50, lr=0.001, batch_size=32, epochs=50)
 
     PROFILING_MODE = False

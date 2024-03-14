@@ -205,7 +205,7 @@ class NGDmax(GDmax):
         policy = adv_policy if adversary else team_policy
         optimizer = adv_optimizer if adversary else team_optimizer
 
-        # policy = policy.to("mps")
+        policy = policy.to("mps")
 
         for epoch in range(self.epochs):
             perm  = torch.randperm(len(return_data))
@@ -216,14 +216,14 @@ class NGDmax(GDmax):
 
             for batch in range(0, len(return_data), self.batch_size):
                 # batch_log_probs = new_log_probs[batch:batch+self.batch_size] # .to("mps")
-                batch_log_probs = policy.evaluate_actions(new_obs[batch:batch+self.batch_size], new_actions[batch:batch+self.batch_size])
-                batch_returns = new_returns[batch:batch+self.batch_size]# .to("mps")
+                batch_log_probs = policy.evaluate_actions(new_obs[batch:batch+self.batch_size], new_actions[batch:batch+self.batch_size]).to("mps")
+                batch_returns = new_returns[batch:batch+self.batch_size].to("mps")
                 loss = torch.dot(batch_log_probs, batch_returns)
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward(retain_graph=True)
                 optimizer.step()
 
-        # policy = policy.to("cpu")
+        policy = policy.to("cpu")
 
     def get_adv_br(self):
         temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128])
