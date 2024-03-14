@@ -67,6 +67,7 @@ class MAPolicyNetwork(nn.Module):
             prev_dim = hl_dims[i]
 
         self.action_map = action_map
+        # self.lookup_table = torch.cumsum(torch.ones((len(action_map), ), dtype=int), 0).reshape((int(np.sqrt(action_size)), int(np.sqrt(action_size)))) - 1
         self.relu = torch.nn.ReLU()
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -106,7 +107,11 @@ class MAPolicyNetwork(nn.Module):
         dist = torch.distributions.Categorical(logits=self.forward(x))
         action = dist.sample()
         log_prob = dist.log_prob(action)
-        return self.action_map[action], log_prob
+        return action, log_prob # self.action_map[action], log_prob
+    
+    def evaluate_actions(self, obs: torch.tensor, actions: torch.tensor):
+        dist = torch.distributions.Categorical(logits=(self.forward(obs)))
+        return dist.log_prob(actions)
 
         
 class GDmax:

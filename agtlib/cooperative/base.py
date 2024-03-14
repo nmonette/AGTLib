@@ -78,6 +78,10 @@ class PolicyNetwork(nn.Module):
         log_prob = dist.log_prob(action)
 
         return action, log_prob
+    
+    def evaluate_actions(self, obs: torch.tensor, actions: torch.tensor):
+        dist = torch.distributions.Categorical(logits=(self.forward(obs)))
+        return dist.log_prob(actions)
 
 
 class ValueNetwork(nn.Module):

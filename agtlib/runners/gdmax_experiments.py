@@ -88,7 +88,7 @@ def n_reinforce_experiment():
     
     dim = 3
      # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
-    gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=1000, lr=0.001, batch_size=512, epochs=50)
+    gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=50, lr=0.001, batch_size=32, epochs=50)
 
     PROFILING_MODE = False
 

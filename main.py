@@ -30,10 +30,12 @@ from treasure_hunt import TeamEmptyEnv
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
+    torch.autograd.set_detect_anomaly(True)
     # test_lgdmax_weights()
     # test_reinforce()
     # test_n_reinforce()
     # test_n_reinforce()
+    # torch.autograd.set_detect_anomaly(True)
     n_reinforce_experiment()
     # reinforce_experiment()
     # nlgdmax_grid_experiment()
