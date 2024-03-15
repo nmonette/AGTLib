@@ -226,7 +226,7 @@ class NGDmax(GDmax):
                     optimizer.step()
             
         else:
-            new_log_probs = torch.stack(log_probs)
+            new_log_probs = torch.stack(log_probs).to("mps")
             new_returns = torch.tensor(return_data, device="mps", requires_grad=True).flip(-1)
 
             loss = torch.dot(new_log_probs, new_returns)
