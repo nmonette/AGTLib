@@ -145,7 +145,7 @@ class NGDmax(GDmax):
         self.seg_length = seg_length
         self.num_threads = num_threads
 
-    def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
+    def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None, br = True):
         if rollout_length is None:
             rollout_length = self.rollout_length
 
@@ -207,7 +207,7 @@ class NGDmax(GDmax):
 
         policy = policy.to("mps")
 
-        if adversary:
+        if br:
 
             for epoch in range(self.epochs):
                 perm  = torch.randperm(len(return_data))
@@ -262,7 +262,7 @@ class NGDmax(GDmax):
     def step_with_gap(self):
         self.update()
         
-        self.update(adversary=False)
+        self.update(adversary=False, br=False)
 
         adv_base, team_base = self.get_utility()
 
