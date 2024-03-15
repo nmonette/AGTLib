@@ -161,7 +161,7 @@ class NGDmax(GDmax):
         if adv_optimizer is None:
             adv_optimizer = self.adv_optimizer
 
-        # log_probs = []
+        log_probs = []
         obs_data = []
         action_data = []
         return_data = []
@@ -188,9 +188,9 @@ class NGDmax(GDmax):
                     action_data.append(adv_action)
                     rewards.append(reward[len(reward) - 1])
                 else:
-                    # log_probs.append(team_log_prob)
-                    obs_data.append(team_obs)
-                    action_data.append(team_action)
+                    log_probs.append(team_log_prob)
+                    # obs_data.append(team_obs)
+                    # action_data.append(team_action)
                     rewards.append(reward[0])
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
@@ -207,21 +207,32 @@ class NGDmax(GDmax):
 
         policy = policy.to("mps")
 
-        for epoch in range(self.epochs):
-            perm  = torch.randperm(len(return_data))
-            # new_log_probs = torch.stack(log_probs)[perm]
-            new_returns = torch.tensor(return_data, device="cpu", requires_grad=True).flip(-1)[perm]
-            new_obs = torch.stack(obs_data)[perm]
-            new_actions = torch.tensor(action_data, device="cpu")[perm]
+        if adversary:
 
-            for batch in range(0, len(return_data), self.batch_size):
-                # batch_log_probs = new_log_probs[batch:batch+self.batch_size] # .to("mps")
-                batch_log_probs = policy.evaluate_actions(new_obs[batch:batch+self.batch_size].to("mps"), new_actions[batch:batch+self.batch_size].to("mps"))
-                batch_returns = new_returns[batch:batch+self.batch_size].to("mps")
-                loss = torch.dot(batch_log_probs, batch_returns)
-                optimizer.zero_grad(set_to_none=True)
-                loss.backward(retain_graph=True)
-                optimizer.step()
+            for epoch in range(self.epochs):
+                perm  = torch.randperm(len(return_data))
+                # new_log_probs = torch.stack(log_probs)[perm]
+                new_returns = torch.tensor(return_data, device="cpu", requires_grad=True).flip(-1)[perm]
+                new_obs = torch.stack(obs_data)[perm]
+                new_actions = torch.tensor(action_data, device="cpu")[perm]
+
+                for batch in range(0, len(return_data), self.batch_size):
+                    # batch_log_probs = new_log_probs[batch:batch+self.batch_size] # .to("mps")
+                    batch_log_probs = policy.evaluate_actions(new_obs[batch:batch+self.batch_size].to("mps"), new_actions[batch:batch+self.batch_size].to("mps"))
+                    batch_returns = new_returns[batch:batch+self.batch_size].to("mps")
+                    loss = torch.dot(batch_log_probs, batch_returns)
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward(retain_graph=True)
+                    optimizer.step()
+            
+        else:
+            new_log_probs = torch.stack(log_probs)
+            new_returns = torch.tensor(return_data, device="mps", requires_grad=True).flip(-1)
+
+            loss = torch.dot(new_log_probs, new_returns)
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
 
         policy = policy.to("cpu")
 
@@ -230,8 +241,7 @@ class NGDmax(GDmax):
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=True)
         
-        for i in range(self.br_length):
-            self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
+        self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
 
         return self.get_utility(adv_policy=None)
 
@@ -240,20 +250,17 @@ class NGDmax(GDmax):
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
 
-        for i in range(self.br_length):
-            self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
+        self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
 
         return self.get_utility(team_policy=temp_team)[1]
 
     def step(self):
-        for i in range(self.br_length):
-            self.update()
+        self.update()
 
         self.update(adversary=False)
     
     def step_with_gap(self):
-        for i in range(self.br_length):
-            self.update()
+        self.update()
         
         self.update(adversary=False)
 
