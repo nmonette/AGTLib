@@ -47,18 +47,23 @@ def test_n_reinforce():
     team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
     adv = PolicyNetwork(15, 4)
 
-    team.load_state_dict(torch.load("./output/experiment-40/end-3x3-team-policy-n-reinforce.pt"))
-    adv.load_state_dict(torch.load("./output/experiment-40/end-3x3-adv-policy-n-reinforce.pt"))
+    team.load_state_dict(torch.load(f"output/phil-experiment/end-3x3-team-policy-n-reinforce.pt"))
+    adv.load_state_dict(torch.load(f"output/phil-experiment/end-3x3-adv-policy-n-reinforce.pt"))
     
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-TeamWins", agents=3, allow_agent_overlap=True, render_mode="human", disable_env_checker=True))
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, allow_agent_overlap=True, render_mode="human", disable_env_checker=True))
     for episode in range(100):
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
-            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+            team_action, _ = team.get_actions(team_obs)
+            adv_action, _ = adv.get_action(adv_obs)
             adv_action = adv_action.item()
-            action = {i: team_action[i] for i in range(len(team_action))}
+            team_translated = team.action_map[team_action]
+            action = {}
+            for i in range(len(team_translated)):
+                action[i] = team_translated[i]
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
             print(action, reward)
@@ -72,15 +77,16 @@ def n_reinforce_experiment():
     def save(iteration="end"):
         plt.xlabel("Iterations")
         plt.ylabel("Nash Gap")
-        plt.plot(range(0, len(gdm.nash_gap), 50), gdm.nash_gap)
+        plt.plot(range(0, len(gdm.nash_gap)), gdm.nash_gap)
         plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-nashgap.png")
-        plt.close
+        plt.close()
 
         plt.xlabel("Iterations")
         plt.ylabel("Team Utility against ADV BR")
-        plt.plot(range(0, len(gdm.nash_gap), 50), gdm.team_utility)
+        plt.plot(range(0, len(gdm.nash_gap)), gdm.team_utility)
         plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-team-rewards.png")
-        
+        plt.close()
+
         team = gdm.team_policy
         torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-team-policy-n-reinforce.pt")
         adv = gdm.adv_policy
@@ -88,12 +94,12 @@ def n_reinforce_experiment():
     
     dim = 3
     # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
-    gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=50, lr=0.001, batch_size=32, epochs=50)
+    gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=50, lr=0.01, batch_size=64, epochs=50)
 
     PROFILING_MODE = False
 
     time_taken_sum = 0
-    iterations = 50000
+    iterations = 10000
     for i in range(iterations):
         x = time()
         if i % 50 == 0 and not PROFILING_MODE:
@@ -117,8 +123,8 @@ def n_reinforce_experiment():
     # team = SoftmaxPolicy(2, 4, [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], 0.01, [(i,j) for i in range(4) for j in range(4)])
     # adv = PolicyNetwork(15, 4)
 
-    # team.load_state_dict(torch.load(f"{dim}x{dim}-team-policy-final.pt"))
-    # adv.load_state_dict(torch.load(f"{dim}x{dim}-adv-policy-final.pt"))
+    # team.load_state_dict(torch.load(f"output/experiment-125/end-3x3-team-policy-n-reinforce.pt"))
+    # adv.load_state_dict(torch.load(f"output/experiment-125/end-3x3-adv-policy-n-reinforce.pt"))
 
     team = gdm.team_policy
     adv = gdm.adv_policy
@@ -132,7 +138,10 @@ def n_reinforce_experiment():
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
             # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
-            action = {i: team_action[i] for i in range(len(team_action))}
+            team_translated = team.action_map[team_action]
+            action = {}
+            for i in range(len(team_translated)):
+                action[i] = team_translated[i]
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
             print(action, reward)
