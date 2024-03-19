@@ -11,7 +11,7 @@ import numpy as np
 
 from ..cooperative.base import PolicyNetwork
 from ..cooperative.pg import GDmax, LGDmax, NGDmax
-from ..cooperative.reinforce import GDmax as REINFORCE, NGDmax as NREINFORCE
+from ..cooperative.reinforce import GDmax as REINFORCE, NGDmax as NREINFORCE, QGDMax as QREINFORCE
 from ..cooperative.pg import MAPolicyNetwork, SoftmaxPolicy
 from ..cooperative.lambda_pg import NLGDmax, TwoHeadPolicy
 from ..utils.env import MultiGridWrapper
@@ -31,11 +31,15 @@ def test_reinforce():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
-            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+            team_action, _ = team.get_actions(team_obs)
+            adv_action, _ = adv.get_action(adv_obs)
             adv_action = adv_action.item()
-            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
-            action = {i: team_action[i] for i in range(len(team_action))}
+            team_translated = team.action_map[team_action]
+            action = {}
+            for i in range(len(team_translated)):
+                action[i] = team_translated[i]
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
             print(action, reward)
@@ -47,8 +51,8 @@ def test_n_reinforce():
     team = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)]) 
     adv = PolicyNetwork(15, 4)
 
-    team.load_state_dict(torch.load(f"output/phil-experiment/end-3x3-team-policy-n-reinforce.pt"))
-    adv.load_state_dict(torch.load(f"output/phil-experiment/end-3x3-adv-policy-n-reinforce.pt"))
+    team.load_state_dict(torch.load(f"output/experiment-207/500-3x3-team-policy-n-reinforce.pt"))
+    adv.load_state_dict(torch.load(f"output/experiment-207/500-3x3-adv-policy-n-reinforce.pt"))
     
     env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, allow_agent_overlap=True, render_mode="human", disable_env_checker=True))
     for episode in range(100):
@@ -70,6 +74,74 @@ def test_n_reinforce():
             sleep(0.5)
             if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                 break
+
+def q_reinforce_experiment():
+    experiment_num = len(list(os.walk('./output')))
+    os.makedirs(f"output/experiment-{experiment_num}")
+    def save(iteration="end"):
+        plt.xlabel("Iterations")
+        plt.ylabel("Nash Gap")
+        plt.plot(range(0, len(gdm.nash_gap)), gdm.nash_gap)
+        plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-nashgap.png")
+        plt.close()
+
+        plt.xlabel("Iterations")
+        plt.ylabel("Team Utility against ADV BR")
+        plt.plot(range(0, len(gdm.nash_gap)), gdm.team_utility)
+        plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-team-rewards.png")
+        plt.close()
+
+    dim = 3
+    # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
+    qtable = torch.zeros((dim, dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4))
+    gdm = QREINFORCE(qtable, 15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=50, lr=0.1, gamma=1, batch_size=64, epochs=50, br_thresh=1e-8)
+
+    PROFILING_MODE = True
+
+    time_taken_sum = 0
+    iterations = 100
+    for i in range(iterations):
+        x = time()
+        if i % 50 == 0 and not PROFILING_MODE:
+            gdm.step_with_gap()
+            print(f"Nash Gap: {gdm.nash_gap[-1]:.6f}")
+        else:
+            gdm.step() # 4
+
+        print(f"Iteration {i} done in {time() - x:.2f}s\t", end="")
+        time_taken_sum += time() - x
+        time_remaining = (iterations - i) * (time_taken_sum / (i+1))
+        print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
+        if i % 500 == 0 and not PROFILING_MODE:
+            # Save progress
+            print("Saving progress...")
+            save(i)
+            
+    save()
+
+    team = gdm.team_policy
+    adv = gdm.qpolicy
+    
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human", disable_env_checker=True))
+    for episode in range(100):
+        obs, _ = env.reset()
+        env.render()
+        while True:
+            team_action, _ = team.get_actions(obs[0])
+            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            adv_action = adv_action.item()
+            team_translated = team.action_map[team_action]
+            action = {}
+            for i in range(len(team_translated)):
+                action[i] = team_translated[i]
+            action[len(action)] = adv_action
+            obs, reward, trunc, done, _ = env.step(action)
+            print(action, reward)
+            sleep(0.5)
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
+
+
 
 def n_reinforce_experiment():
     experiment_num = len(list(os.walk('./output')))
@@ -94,12 +166,12 @@ def n_reinforce_experiment():
     
     dim = 3
     # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
-    gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=50, lr=0.01, batch_size=64, epochs=50)
+    gdm = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=50, lr=0.1, gamma=1, batch_size=64, epochs=50, br_thresh=1e-8)
 
     PROFILING_MODE = False
 
     time_taken_sum = 0
-    iterations = 10000
+    iterations = 1000
     for i in range(iterations):
         x = time()
         if i % 50 == 0 and not PROFILING_MODE:
@@ -129,7 +201,7 @@ def n_reinforce_experiment():
     team = gdm.team_policy
     adv = gdm.adv_policy
     
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human", disable_env_checker=True))
     for episode in range(100):
         obs, _ = env.reset()
         env.render()
@@ -166,7 +238,7 @@ def reinforce_experiment():
     gdm = REINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3)), param_dims=[dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16], rollout_length=50, lr=0.001)
     time_taken_sum = 0
     time_taken_sum = 0
-    iterations = 10000
+    iterations = 100
     for i in range(iterations):
         x = time()
         if i % 100 == 0:

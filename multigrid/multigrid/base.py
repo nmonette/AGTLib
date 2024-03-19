@@ -598,7 +598,7 @@ class MultiGridEnv(gym.Env, RandomMixin, ABC):
         """
         Compute the reward to be given upon success.
         """
-        return 1 - 0.9 * (self.step_count / self.max_steps)
+        return 1 # - 0.9 * (self.step_count / self.max_steps)
         
 
     def place_obj(

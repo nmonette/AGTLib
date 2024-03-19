@@ -1,12 +1,13 @@
 import torch
 
-from .pg import SoftmaxPolicy, MAPolicyNetwork
+from .pg import SoftmaxPolicy, MAPolicyNetwork, SELUMAPolicy
+from .q import TabularQ
 from .base import PolicyNetwork, SELUPolicy
 from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
 
 
 class GDmax:
-    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_length: int = 100):
+    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_thresh: int = 1e-6):
         self.obs_size = obs_size
         self.action_size = action_size
         self.env = env() # used to be env()
@@ -14,11 +15,11 @@ class GDmax:
         self.lr = lr
         self.gamma = gamma
         self.rollout_length = rollout_length
-        self.br_length = br_length
+        self.br_thresh = br_thresh
         
         self.adv_policy = SELUPolicy(obs_size, action_size, hl_dims)
         # self.adv_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-adv-policy-n-reinforce.pt"))
-        self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=True)
+        self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=False)
         self.param_dims = param_dims
         if param_dims is not None:
             self.team_policy = SoftmaxPolicy(2, 4, param_dims, lr, [(i,j) for i in range(self.action_size) for j in range(self.action_size)]) 
@@ -58,9 +59,9 @@ class GDmax:
             returns.append(self.gamma * returns[-1] + rewards[-i])
 
         log_probs = torch.stack(log_probs)
-        returns = torch.tensor(returns, dtype=torch.float32).flip(-1)
+        returns = torch.tensor(returns).flip(-1)
 
-        loss = torch.dot(log_probs, returns)
+        loss = -torch.dot(log_probs, returns)
 
         if adversary:
             self.adv_optimizer.zero_grad(set_to_none=True)
@@ -133,11 +134,11 @@ class GDmax:
 
 class NGDmax(GDmax):
 
-    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_length: int = 100, batch_size:int =32, epochs=100, seg_length = 12, num_threads = 10):
-        super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length, br_length)
-        self.team_policy = MAPolicyNetwork(15, 16, [(i,j) for i in range(4) for j in range(4)])
+    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_thresh: int = 1e-6, batch_size:int =32, epochs=100, seg_length = 12, num_threads = 10):
+        super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length, br_thresh)
+        self.team_policy = SELUMAPolicy(15, 16, [(i,j) for i in range(4) for j in range(4)])
         # self.team_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-team-policy-n-reinforce.pt"))
-        self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=True)
+        self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=False)
 
         self.batch_size = batch_size
         self.epochs = epochs
@@ -196,51 +197,108 @@ class NGDmax(GDmax):
             returns.append(self.gamma * returns[-1] + rewards[-i])
 
         log_prob_data = torch.stack(log_probs)
-        return_data = torch.tensor(returns)
+        return_data = torch.tensor(returns, requires_grad=True, dtype=torch.float32).flip(-1)
 
         policy = adv_policy if adversary else team_policy
         optimizer = adv_optimizer if adversary else team_optimizer
 
         # policy = policy.to("mps")
 
-        loss = torch.dot(log_prob_data, return_data)
+        loss = -torch.dot(log_prob_data, return_data)
+
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-            
-
-
+        
+        return loss # torch.mean(return_data)
         # policy = policy.to("cpu")
 
     def get_adv_br(self):
-        temp_adv = PolicyNetwork(self.obs_size, self.action_size, hl_dims=[64,128])
+        temp_adv = SELUPolicy(self.obs_size, self.action_size, hl_dims=[64,128])
         temp_adv.load_state_dict(self.adv_policy.state_dict())
-        temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=True)
+        temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=False)
 
-        for i in range(self.br_length):
+        # prev = 0
+        # zero_count =0
+        # x = torch.abs(self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer))
+        # while torch.abs(torch.abs(x) - prev) > self.br_thresh or x == 0:
+        #     prev = x
+        #     x = torch.abs(self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer))
+
+        #     if x == 0:
+        #         zero_count += 1
+        #     else:
+        #         zero_count = 0
+        #     if zero_count == 5:
+        #         break
+
+        for i in range(100):
             self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
 
         return self.get_utility(adv_policy=None)
 
     def get_team_br(self):
-        temp_team = MAPolicyNetwork(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128])
+        temp_team = SELUMAPolicy(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128])
         temp_team.load_state_dict(self.team_policy.state_dict())
-        temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=True)
-        for i in range(self.br_length):
+        temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=False)
+
+        # zero_count = 0
+        # prev = 0
+        # x = torch.abs(self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer))
+        # while torch.abs(x - prev) > self.br_thresh or x == 0:
+        #     prev = x
+        #     x = torch.abs(self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer))    
+
+        #     if x == 0:
+        #         zero_count += 1
+        #     else:
+        #         zero_count = 0
+        #     if zero_count == 5:
+        #         break
+
+        for i in range(100):
             self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
 
         return self.get_utility(team_policy=temp_team)[1]
 
     def step(self):
-        for i in range(self.br_length):
+        # prev = 0
+        # zero_count = 0
+        # x = torch.abs(self.update())
+        # while torch.abs(x- prev) > self.br_thresh or x == 0:
+        #     prev = x
+        #     x = torch.abs(self.update())
+
+        #     if x == 0:
+        #         zero_count += 1
+        #     else:
+        #         zero_count = 0
+        #     if zero_count == 5:
+        #         break
+
+        for i in range(100):
             self.update()
 
         self.update(adversary=False)
     
     def step_with_gap(self):
-        for i in range(self.br_length):
+        # prev = 0
+        # x = torch.abs(self.update())
+        # zero_count = 0
+        # while (diff := torch.abs(x - prev)) > self.br_thresh or x == 0:
+        #     prev = x
+        #     x = torch.abs(self.update())
+
+        #     if x == 0:
+        #         zero_count += 1
+        #     else:
+        #         zero_count = 0
+
+        #     if zero_count == 5:
+        #         break
+        for i in range(100):
             self.update()
-        
+
         self.update(adversary=False)
 
         adv_base, team_base = self.get_utility()
@@ -254,3 +312,16 @@ class NGDmax(GDmax):
 
         # one treasure in top right, one treasure in bottom left, other two corners put the team, put the adversary in the center
         # make it so 
+
+
+class QGDMax(NGDmax):
+    def __init__(self, qtable, obs_size, action_size, env, eps_decay=0.005, min_eps=0.05, max_eps = 1, max_steps = 12, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_thresh: int = 1e-6, batch_size:int =32, epochs=100, seg_length = 12, num_threads = 10):
+        super().__init__(obs_size, action_size, env, hl_dims, lr, gamma, rollout_length, br_thresh, batch_size, epochs, seg_length, num_threads )
+        self.qpolicy = TabularQ(qtable, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env)
+        self.q_args = (qtable, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env)
+    
+    def step(self):
+        self.qpolicy.train(self.team_policy)
+
+        self.update(adversary=False)
+

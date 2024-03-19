@@ -172,26 +172,18 @@ class TeamEmptyEnv(TeamMultiGridEnv):
         if step:
             ## Amount of possibilities in NxN is (N^2 - 2)^num_agents * 2^(num_agents + 2)
             obs = np.empty((3 * self.num_agents + 6, ))
-            for i in range(self.num_agents):
-                obs[i] = self.agents[i].pos[0] - 1
-                obs[i+1] = self.agents[i].pos[1] - 1
-                obs[i+2] = int(self.agents[i].terminated)
+            for i in range(0, self.num_agents):
+                obs[3 * i] = self.agents[i].pos[0] - 1
+                obs[3 * i+1] = self.agents[i].pos[1] - 1
+                obs[3 * i+2] = int(self.agents[i].terminated) 
                     
-            obs[i+3] = self.goal1[0] - 1
-            obs[i+4] = self.goal1[1] - 1
-            obs[i+5] = int(self.goal1_terminated)
+            obs[3*i+3] = self.goal1[0] - 1
+            obs[3*i+4] = self.goal1[1] - 1
+            obs[3*i+5] = int(self.goal1_terminated) 
 
-            obs[i+6] = self.goal2[0] - 1
-            obs[i+7] = self.goal2[1] - 1
-            obs[i+8] = int(self.goal2_terminated)
-
-
-            # final = {}
-            # for i in range(self.num_agents):
-            #     temp = obs.copy()
-            #     for j in range(self.num_agents):
-            #         temp[f"is_{j}"] = int(i == j)
-            #     final[i] = temp
+            obs[3*i+6] = self.goal2[0] - 1
+            obs[3*i+7] = self.goal2[1] - 1
+            obs[3*i+8] = int(self.goal2_terminated) 
 
             return {i:obs for i in range(self.num_agents)} # final
 

@@ -15,7 +15,7 @@ from gymnasium import register
 import multigrid
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import IPPO, PPO
-from agtlib.runners.gdmax_experiments import test_n_reinforce, test_reinforce, ngdmax_experiment, lgdmax_grid_experiment, nlgdmax_grid_experiment, test_lgdmax_weights, gdmax_experiment, reinforce_experiment, n_reinforce_experiment# ,mpe_experiment
+from agtlib.runners.gdmax_experiments import test_n_reinforce, test_reinforce, ngdmax_experiment, lgdmax_grid_experiment, nlgdmax_grid_experiment, test_lgdmax_weights, gdmax_experiment, reinforce_experiment, n_reinforce_experiment, q_reinforce_experiment# ,mpe_experiment
 from agtlib.utils.env import (MultiGridWrapper, SingleAgentEnvWrapper,
                               generate_reward)
 from agtlib.utils.rollout import RolloutManager
@@ -36,7 +36,9 @@ if __name__ == "__main__":
     # test_n_reinforce()
     # test_n_reinforce()
     # torch.autograd.set_detect_anomaly(True)
-    n_reinforce_experiment()
+    # n_reinforce_experiment()
+    q_reinforce_experiment()
+
     # reinforce_experiment()
     # nlgdmax_grid_experiment()
     # 5 actions, 5 states
