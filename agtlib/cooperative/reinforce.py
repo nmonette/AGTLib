@@ -16,7 +16,7 @@ class GDmax:
         self.gamma = gamma
         self.rollout_length = rollout_length
         
-        self.adv_policy = SELUPolicy(obs_size, action_size, hl_dims)
+        self.adv_policy = SELUPolicy(obs_size - 3, action_size, hl_dims)
         # self.adv_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-adv-policy-n-reinforce.pt"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=False)
         self.param_dims = param_dims
@@ -135,7 +135,7 @@ class NGDmax(GDmax):
 
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
         super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
-        self.team_policy = SELUMAPolicy(15, 16, [(i,j) for i in range(4) for j in range(4)], hl_dims=hl_dims)
+        self.team_policy = SELUMAPolicy(obs_size, action_size * action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=hl_dims)
         # self.team_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-team-policy-n-reinforce.pt"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=False)
 
@@ -319,5 +319,5 @@ class QGDmax(NGDmax):
         self.update(adversary=False)
 
     def step_with_gap(self):
-        raise NotImplemented
+        raise NotImplemented("Nash-Gap not implemented for Q-Learning")
 

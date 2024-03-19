@@ -49,8 +49,8 @@ def train(alg, args):
 
         team = alg.team_policy
         torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-team-policy-n-reinforce.pt")
-        adv = alg.adv_policy
-        torch.save(adv.state_dict() if args.algorthm != "QREINFORCE" else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-adv-policy-n-reinforce.pt")
+        adv = alg.adv_policy if args.algorithm != "QREINFORCE" else alg
+        torch.save(adv.state_dict() if args.algorithm != "QREINFORCE" else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-adv-policy-n-reinforce.pt")
     
     time_taken_sum = 0
     for i in range(args.iters):
@@ -65,10 +65,10 @@ def train(alg, args):
         time_taken_sum += time() - x
         time_remaining = (args.iters - i) * (time_taken_sum / (i+1))
         print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
-        if i % 500 == 0 and args.save:
+        if i % 500 == 0 and not args.disable_save:
             # Save progress
             print("Saving progress...")
             save(i)
     
-    if args.save:      
+    if not args.disable_save:      
         save()

@@ -50,8 +50,6 @@ class MultiGridWrapper(gym.Wrapper):
 
     def reset(self, *args, **kwargs):
         obs, _ = self.env.reset(**kwargs)
-        # for i in obs:
-        #     obs[i] = np.concatenate([np.array(j).flatten() for j in obs[i].values()])
 
         return obs, _
 
@@ -66,9 +64,33 @@ class MultiGridWrapper(gym.Wrapper):
     def render(self):
         self.env.render()
 
-# @ray.remote
-# class RayMultiGridWrapper(MultiGridWrapper):
-#     pass
+class DecentralizedMGWrapper(gym.Wrapper):
+    def __init__(self, env: gym.Env) -> None:
+        """
+        Parameters
+        ----------
+        env: gym.Env
+            Simulation environment.
+        """
+        self.env = env
+    
+    def reset(self, *args, **kwargs):
+        obs, _ = self.env.reset()
+        obs = obs[0]
+        return {0: obs[[i for i in range(len(obs) - 9)] + [i for i in range(len(obs) - 6, len(obs))]], 1: obs[len(obs) - 9:]}, _
+    
+    def step(self, action: dict):
+        obs, reward, done, trunc, _ = self.env.step(action)
+        obs = obs[0]
+        obs = {0: obs[[i for i in range(len(obs) - 9)] + [i for i in range(len(obs) - 6, len(obs))]], 1: obs[len(obs) - 9:]}
+    
+        if isinstance(trunc, bool):
+            trunc = {i: trunc for i in range(len(obs))}
+        
+        return obs, reward, done, trunc, _
+    
+    def render(self):
+        self.env.render()
     
 def action_to_index(action, n_agents):
     """

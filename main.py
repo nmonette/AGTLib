@@ -7,7 +7,7 @@ from agtlib.cooperative.pg import NGDmax, SELUMAPolicy
 from agtlib.cooperative.base import SELUPolicy
 from agtlib.cooperative.q import TabularQ
 
-from agtlib.utils.env import MultiGridWrapper
+from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper
 
 import gymnasium as gym
 import torch
@@ -17,21 +17,21 @@ def main(cmd_args=sys.argv[1:]):
 
     if args.algorithm == "NREINFORCE":
         if args.eval:
-            team = SELUMAPolicy(15, 16, [(i,j) for i in range(4) for j in range(4)], args.net_arch) 
-            adv = SELUPolicy(15, 4)
+            team = SELUMAPolicy(12, 16, [(i,j) for i in range(4) for j in range(4)], args.net_arch) 
+            adv = SELUPolicy(9, 4)
             team.load_state_dict(torch.load(args.team))
             adv.load_state_dict(torch.load(args.adv))
 
             eval(team, adv)
    
         else:
-            alg = NREINFORCE(15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma)
+            alg = NREINFORCE(12,4, lambda: DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma)
             train(alg, args)
 
     elif args.algorithm == "QREINFORCE":
         dim = 3
         if args.eval:
-            team = SELUMAPolicy(15, 16, [(i,j) for i in range(4) for j in range(4)], args.net_arch) 
+            team = SELUMAPolicy(12, 16, [(i,j) for i in range(4) for j in range(4)], args.net_arch) 
             qtable = torch.load(args.adv)
             adv = TabularQ(qtable, 0.005, 0.05, 1, args.lr, args.gamma, args.rollout_length, 12, lambda: None)
             team.load_state_dict(torch.load(args.team))
@@ -39,8 +39,8 @@ def main(cmd_args=sys.argv[1:]):
             eval(team, adv)
 
         else:
-            qtable = torch.zeros((dim, dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4))
-            alg = QREINFORCE(qtable, 15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=100, lr=0.1, gamma=1)
+            qtable = torch.zeros((dim, dim, 2, dim, dim, 2, dim ,dim, 2, 4))
+            alg = QREINFORCE(qtable, 12, 4, lambda: DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma)
             train(alg, args)
 
     else:
