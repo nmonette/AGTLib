@@ -79,27 +79,33 @@ def q_reinforce_experiment():
     experiment_num = len(list(os.walk('./output')))
     os.makedirs(f"output/experiment-{experiment_num}")
     def save(iteration="end"):
-        plt.xlabel("Iterations")
-        plt.ylabel("Nash Gap")
-        plt.plot(range(0, len(gdm.nash_gap)), gdm.nash_gap)
-        plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-nashgap.png")
-        plt.close()
+        # plt.xlabel("Iterations")
+        # plt.ylabel("Nash Gap")
+        # plt.plot(range(0, len(gdm.nash_gap)), gdm.nash_gap)
+        # plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-nashgap.png")
+        # plt.close()
 
-        plt.xlabel("Iterations")
-        plt.ylabel("Team Utility against ADV BR")
-        plt.plot(range(0, len(gdm.nash_gap)), gdm.team_utility)
-        plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-team-rewards.png")
-        plt.close()
+        # plt.xlabel("Iterations")
+        # plt.ylabel("Team Utility against ADV BR")
+        # plt.plot(range(0, len(gdm.nash_gap)), gdm.team_utility)
+        # plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-team-rewards.png")
+        # plt.close()
+
+        team = gdm.team_policy
+        torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-team-policy-n-reinforce.pt")
+
+        adv = gdm.qpolicy.table
+        torch.save(adv, f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-adv-qpolicy-n-reinforce.pt")
 
     dim = 3
     # lambda: gym.make("TreasureHunt-3x3-Team", disable_env_checker=True)
     qtable = torch.zeros((dim, dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 4))
-    gdm = QREINFORCE(qtable, 15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=50, lr=0.1, gamma=1, batch_size=64, epochs=50, br_thresh=1e-8)
+    gdm = QREINFORCE(qtable, 15,4, lambda: MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=100, lr=0.1, gamma=1, batch_size=64, epochs=50, br_thresh=1e-8)
 
     PROFILING_MODE = True
 
     time_taken_sum = 0
-    iterations = 100
+    iterations = 1000
     for i in range(iterations):
         x = time()
         if i % 50 == 0 and not PROFILING_MODE:
@@ -127,8 +133,10 @@ def q_reinforce_experiment():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
-            adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
+            team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+            team_action, _ = team.get_actions(team_obs)
+            adv_action, _ = adv.get_action(adv_obs)
             adv_action = adv_action.item()
             team_translated = team.action_map[team_action]
             action = {}

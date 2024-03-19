@@ -1,4 +1,5 @@
 import torch
+import matplotlib.pyplot as plt
 
 class TabularQ:
     def __init__(self, table, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env):
@@ -18,22 +19,25 @@ class TabularQ:
 
         self.max_steps = max_steps
 
+        self.dist = torch.distributions.Uniform(0, 1)
+
     def get_action(self, obs):
         obs = obs.to(torch.int)
-        if torch.distributions.Bernoulli(1 - self.epsilon):
+        if self.epsilon < self.dist.sample():
             action = torch.argmin(self.table[*obs, :])
         else:
-            action = torch.randint(0, self.table.shape[-1])
+            action = torch.randint(0, self.table.shape[-1], (1, ))
         return action, None
+        
     
     def train(self, opponent_policy):
-        
+        reward_means = []
         for episode in range(self.rollout_length):
             self.epsilon = self.min_eps + (self.max_eps - self.min_eps)*torch.exp(torch.tensor(-self.eps_decay*episode))
             # Reset the environment
             obs, _ = self.env.reset()
             done = False
-
+            rewards = []
             for t in range(self.max_steps):
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
