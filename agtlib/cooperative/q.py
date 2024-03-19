@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 
 class TabularQ:
-    def __init__(self, table, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env):
+    def __init__(self, table, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env, inti_epsilon=1):
         self.table = table
 
         self.min_eps = min_eps
@@ -11,7 +11,7 @@ class TabularQ:
         self.lr = lr
         self.gamma = gamma
 
-        self.epsilon = 1
+        self.epsilon = inti_epsilon
 
         self.rollout_length = rollout_length
 
@@ -42,7 +42,7 @@ class TabularQ:
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
                 team_action, _ = opponent_policy.get_actions(team_obs)
-                adv_action, _ = self.get_action(torch.tensor(adv_obs))
+                adv_action, _ = self.get_action(adv_obs)
                 adv_action = adv_action.item()
                 team_translated = opponent_policy.action_map[team_action]
                 action = {}

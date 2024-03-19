@@ -1,5 +1,4 @@
 from time import sleep
-import gym
 import torch
 from agtlib.cooperative.lambda_pg import TwoHeadPolicy
 from agtlib.cooperative.pg import MAPolicyNetwork
@@ -17,7 +16,7 @@ from gymnasium import register
 import multigrid
 from agtlib.cooperative.base import PolicyNetwork
 from agtlib.cooperative.ppo import IPPO, PPO
-from agtlib.runners.gdmax_experiments import grid_experiment_3x3, lgdmax_grid_experiment, nlgdmax_grid_experiment# ,mpe_experiment
+from agtlib.runners.gdmax_experiments_old import grid_experiment_3x3, lgdmax_grid_experiment, nlgdmax_grid_experiment# ,mpe_experiment
 from agtlib.utils.env import (MultiGridWrapper, SingleAgentEnvWrapper,
                               generate_reward)
 from agtlib.utils.rollout import RolloutManager

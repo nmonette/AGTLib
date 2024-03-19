@@ -7,7 +7,7 @@ from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
 
 
 class GDmax:
-    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_thresh: int = 1e-6):
+    def __init__(self, obs_size, action_size, env, param_dims, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
         self.obs_size = obs_size
         self.action_size = action_size
         self.env = env() # used to be env()
@@ -15,7 +15,6 @@ class GDmax:
         self.lr = lr
         self.gamma = gamma
         self.rollout_length = rollout_length
-        self.br_thresh = br_thresh
         
         self.adv_policy = SELUPolicy(obs_size, action_size, hl_dims)
         # self.adv_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-adv-policy-n-reinforce.pt"))
@@ -134,17 +133,11 @@ class GDmax:
 
 class NGDmax(GDmax):
 
-    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_thresh: int = 1e-6, batch_size:int =32, epochs=100, seg_length = 12, num_threads = 10):
-        super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length, br_thresh)
-        self.team_policy = SELUMAPolicy(15, 16, [(i,j) for i in range(4) for j in range(4)])
+    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
+        super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
+        self.team_policy = SELUMAPolicy(15, 16, [(i,j) for i in range(4) for j in range(4)], hl_dims=hl_dims)
         # self.team_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-team-policy-n-reinforce.pt"))
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=False)
-
-        self.batch_size = batch_size
-        self.epochs = epochs
-
-        self.seg_length = seg_length
-        self.num_threads = num_threads
 
     def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
         if rollout_length is None:
@@ -314,9 +307,9 @@ class NGDmax(GDmax):
         # make it so 
 
 
-class QGDMax(NGDmax):
-    def __init__(self, qtable, obs_size, action_size, env, eps_decay=0.005, min_eps=0.05, max_eps = 1, max_steps = 12, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_thresh: int = 1e-6, batch_size:int =32, epochs=100, seg_length = 12, num_threads = 10):
-        super().__init__(obs_size, action_size, env, hl_dims, lr, gamma, rollout_length, br_thresh, batch_size, epochs, seg_length, num_threads )
+class QGDmax(NGDmax):
+    def __init__(self, qtable, obs_size, action_size, env, eps_decay=0.005, min_eps=0.05, max_eps = 1, max_steps = 12, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
+        super().__init__(obs_size, action_size, env, hl_dims, lr, gamma, rollout_length)
         self.qpolicy = TabularQ(qtable, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env)
         self.q_args = (qtable, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env)
     
@@ -324,4 +317,7 @@ class QGDMax(NGDmax):
         self.qpolicy.train(self.team_policy)
 
         self.update(adversary=False)
+
+    def step_with_gap(self):
+        raise NotImplemented
 
