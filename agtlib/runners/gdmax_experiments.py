@@ -55,7 +55,7 @@ def train(alg, args):
     time_taken_sum = 0
     for i in range(args.iters):
         x = time()
-        if args.nash_gap and i % 50 == 0: 
+        if args.nash_gap and i % args.metric_interval == 0: 
             alg.step_with_gap()
             print(f"Nash Gap: {alg.nash_gap[-1]:.6f}")
         else:
@@ -65,10 +65,11 @@ def train(alg, args):
         time_taken_sum += time() - x
         time_remaining = (args.iters - i) * (time_taken_sum / (i+1))
         print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
-        if i % 500 == 0 and not args.disable_save:
+        if i % args.save_interval == 0 and not args.disable_save:
             # Save progress
             print("Saving progress...")
             save(i)
     
-    if not args.disable_save:      
+    if not args.disable_save:    
+        print("Saving progress...")  
         save()

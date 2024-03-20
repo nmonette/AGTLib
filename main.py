@@ -32,7 +32,7 @@ def main(cmd_args=sys.argv[1:]):
         dim = 3
         if args.eval:
             team = SELUMAPolicy(12, 16, [(i,j) for i in range(4) for j in range(4)], hl_dims=args.net_arch) 
-            team.load_state_dict(torch.load(args.team), strict=False)
+            team.load_state_dict(torch.load(args.team))
 
             qtable = torch.load(args.adv)
             adv = TabularQ(qtable, 0.005, 0.05, 1, args.lr, args.gamma, args.rollout_length, 12, lambda: None, 0)

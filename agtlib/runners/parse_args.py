@@ -43,6 +43,12 @@ def parse_args(cmd_args=sys.argv[1:]):
     parser.add_argument(
         "-br", "--br-length", help="Number of updates to find best respond", type=int, default=100, dest="br_length"
     )
+    parser.add_argument(
+        "-mi", "--metric-interval", help="Number of iterations between metric collection", type=int, default=50, dest="metric_interval"
+    )
+    parser.add_argument(
+        "-si", "--save-interval", help="Number of iterations between model saves", type=int, default=500, dest="save_interval"
+    )
 
     args, _ = parser.parse_known_args(cmd_args)
 
