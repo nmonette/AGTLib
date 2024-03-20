@@ -15,8 +15,9 @@ class GDmax:
         self.lr = lr
         self.gamma = gamma
         self.rollout_length = rollout_length
+        self.hl_dims = hl_dims
         
-        self.adv_policy = SELUPolicy(obs_size - 3, action_size, hl_dims)
+        self.adv_policy = SELUPolicy(obs_size - 3, action_size, hl_dims.copy())
         # self.adv_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-adv-policy-n-reinforce.pt"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=False)
         self.param_dims = param_dims
@@ -100,7 +101,7 @@ class GDmax:
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                     break
         
-        return -torch.mean(torch.tensor(team_rewards), dtype=torch.float32), torch.mean(torch.tensor(team_rewards, dtype=torch.float32))
+        return torch.mean(torch.tensor(adv_rewards), dtype=torch.float32), torch.mean(torch.tensor(team_rewards, dtype=torch.float32))
     
     def get_adv_gap(self):
         temp_team = SoftmaxPolicy(2, self.action_size, self.param_dims, self.lr, [(i,j) for i in range(self.action_size) for j in range(self.action_size)])
@@ -134,9 +135,22 @@ class GDmax:
 class NGDmax(GDmax):
 
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
-        super().__init__(obs_size, action_size, env, None, hl_dims, lr, gamma, rollout_length)
-        self.team_policy = SELUMAPolicy(obs_size, action_size * action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=hl_dims)
-        # self.team_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-team-policy-n-reinforce.pt"))
+        self.obs_size = obs_size
+        self.action_size = action_size
+        self.env = env() # used to be env()
+        self.lr = lr
+
+        self.gamma = gamma
+        self.rollout_length = rollout_length
+        self.hl_dims = hl_dims
+                
+        self.nash_gap = []
+        self.team_utility = []
+
+        self.adv_policy = SELUPolicy(obs_size - 3, action_size, hl_dims.copy())
+        self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=False)
+
+        self.team_policy = SELUMAPolicy(obs_size, action_size * action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=hl_dims.copy())
         self.team_optimizer = torch.optim.Adam(self.team_policy.parameters(), lr=lr, maximize=False)
 
     def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
@@ -152,7 +166,7 @@ class NGDmax(GDmax):
         if adv_policy is None:
             adv_policy = self.adv_policy
         
-        if adv_optimizer is None:
+        if adv_optimizer is None and adversary:
             adv_optimizer = self.adv_optimizer
 
         log_probs = []
@@ -203,51 +217,24 @@ class NGDmax(GDmax):
         loss.backward()
         optimizer.step()
         
-        return loss # torch.mean(return_data)
+        return torch.mean(return_data)
+    
         # policy = policy.to("cpu")
 
     def get_adv_br(self):
-        temp_adv = SELUPolicy(self.obs_size, self.action_size, hl_dims=[64,128])
+        temp_adv = SELUPolicy(self.obs_size - 3, self.action_size, hl_dims=self.hl_dims.copy())
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=False)
-
-        # prev = 0
-        # zero_count =0
-        # x = torch.abs(self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer))
-        # while torch.abs(torch.abs(x) - prev) > self.br_thresh or x == 0:
-        #     prev = x
-        #     x = torch.abs(self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer))
-
-        #     if x == 0:
-        #         zero_count += 1
-        #     else:
-        #         zero_count = 0
-        #     if zero_count == 5:
-        #         break
 
         for i in range(100):
             self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
 
-        return self.get_utility(adv_policy=None)
+        return self.get_utility(adv_policy=temp_adv)[0]
 
     def get_team_br(self):
-        temp_team = SELUMAPolicy(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=[64,128])
+        temp_team = SELUMAPolicy(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=self.hl_dims.copy())
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=False)
-
-        # zero_count = 0
-        # prev = 0
-        # x = torch.abs(self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer))
-        # while torch.abs(x - prev) > self.br_thresh or x == 0:
-        #     prev = x
-        #     x = torch.abs(self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer))    
-
-        #     if x == 0:
-        #         zero_count += 1
-        #     else:
-        #         zero_count = 0
-        #     if zero_count == 5:
-        #         break
 
         for i in range(100):
             self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
@@ -255,40 +242,12 @@ class NGDmax(GDmax):
         return self.get_utility(team_policy=temp_team)[1]
 
     def step(self):
-        # prev = 0
-        # zero_count = 0
-        # x = torch.abs(self.update())
-        # while torch.abs(x- prev) > self.br_thresh or x == 0:
-        #     prev = x
-        #     x = torch.abs(self.update())
-
-        #     if x == 0:
-        #         zero_count += 1
-        #     else:
-        #         zero_count = 0
-        #     if zero_count == 5:
-        #         break
-
         for i in range(100):
             self.update()
 
         self.update(adversary=False)
     
     def step_with_gap(self):
-        # prev = 0
-        # x = torch.abs(self.update())
-        # zero_count = 0
-        # while (diff := torch.abs(x - prev)) > self.br_thresh or x == 0:
-        #     prev = x
-        #     x = torch.abs(self.update())
-
-        #     if x == 0:
-        #         zero_count += 1
-        #     else:
-        #         zero_count = 0
-
-        #     if zero_count == 5:
-        #         break
         for i in range(100):
             self.update()
 
@@ -296,9 +255,8 @@ class NGDmax(GDmax):
 
         adv_base, team_base = self.get_utility()
 
-        adv_br, team_adv_br = self.get_adv_br()
+        adv_br = self.get_adv_br()
 
-        self.team_utility.append(team_adv_br)
         self.nash_gap.append(max(adv_br.item() - adv_base.item(), self.get_team_br().item() - team_base.item()))
 
         # team plays some x, assume adversary plays best response, then print utility of team when adversary is giving best response
@@ -311,7 +269,25 @@ class QGDmax(NGDmax):
     def __init__(self, qtable, obs_size, action_size, env, eps_decay=0.005, min_eps=0.05, max_eps = 1, max_steps = 12, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
         super().__init__(obs_size, action_size, env, hl_dims, lr, gamma, rollout_length)
         self.qpolicy = TabularQ(qtable, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env)
+        self.adv_policy = self.qpolicy
         self.q_args = (qtable, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env)
+    
+    def get_adv_br(self):
+        temp_adv = TabularQ(*self.q_args)
+        temp_adv.train(self.team_policy)
+
+        return self.get_utility(adv_policy=temp_adv)[0]
+
+    def get_team_br(self):
+        temp_team = SELUMAPolicy(self.obs_size, self.action_size*self.action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=self.hl_dims.copy())
+        temp_team.load_state_dict(self.team_policy.state_dict())
+        temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=False)
+
+        for i in range(100):
+            self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
+
+        return self.get_utility(team_policy=temp_team)[1]
+        
     
     def step(self):
         self.qpolicy.train(self.team_policy)
@@ -319,5 +295,14 @@ class QGDmax(NGDmax):
         self.update(adversary=False)
 
     def step_with_gap(self):
-        raise NotImplemented("Nash-Gap not implemented for Q-Learning")
+        self.qpolicy.train(self.team_policy)
+
+        self.update(adversary=False)
+
+        adv_base, team_base = self.get_utility()
+
+        adv_br = self.get_adv_br()
+        team_br = self.get_team_br()
+
+        self.nash_gap.append(max(adv_br.item() - adv_base.item(), team_br.item() - team_base.item()))
 

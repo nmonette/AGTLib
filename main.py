@@ -31,16 +31,17 @@ def main(cmd_args=sys.argv[1:]):
     elif args.algorithm == "QREINFORCE":
         dim = 3
         if args.eval:
-            team = SELUMAPolicy(12, 16, [(i,j) for i in range(4) for j in range(4)], args.net_arch) 
+            team = SELUMAPolicy(12, 16, [(i,j) for i in range(4) for j in range(4)], hl_dims=args.net_arch) 
+            team.load_state_dict(torch.load(args.team), strict=False)
+
             qtable = torch.load(args.adv)
-            adv = TabularQ(qtable, 0.005, 0.05, 1, args.lr, args.gamma, args.rollout_length, 12, lambda: None)
-            team.load_state_dict(torch.load(args.team))
+            adv = TabularQ(qtable, 0.005, 0.05, 1, args.lr, args.gamma, args.rollout_length, 12, lambda: None, 0)
 
             eval(team, adv)
 
         else:
             qtable = torch.zeros((dim, dim, 2, dim, dim, 2, dim ,dim, 2, 4))
-            alg = QREINFORCE(qtable, 12, 4, lambda: DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma)
+            alg = QREINFORCE(qtable, 12, 4, lambda: DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, hl_dims=args.net_arch)
             train(alg, args)
 
     else:

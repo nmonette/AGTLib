@@ -1,14 +1,14 @@
 from time import sleep, time
 import os
 
-from agtlib.utils.env import MultiGridWrapper
+from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper
 
 import torch
 import gymnasium as gym
 import matplotlib.pyplot as plt
 
 def eval(team, adv):
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, allow_agent_overlap=True, render_mode="human", disable_env_checker=True)) 
+    env = DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True, render_mode="human"))
 
     for episode in range(100):
         obs, _ = env.reset()
@@ -41,11 +41,11 @@ def train(alg, args):
             plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-nashgap.png")
             plt.close()
 
-            plt.xlabel("Iterations")
-            plt.ylabel("Team Utility against ADV BR")
-            plt.plot(range(0, len(alg.nash_gap)), alg.team_utility)
-            plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-team-rewards.png")
-            plt.close()
+            # plt.xlabel("Iterations")
+            # plt.ylabel("Team Utility against ADV BR")
+            # plt.plot(range(0, len(alg.nash_gap)), alg.team_utility)
+            # plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-team-rewards.png")
+            # plt.close()
 
         team = alg.team_policy
         torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-team-policy-n-reinforce.pt")
