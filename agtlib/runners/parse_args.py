@@ -40,6 +40,9 @@ def parse_args(cmd_args=sys.argv[1:]):
     parser.add_argument(
         "-ds", "--disable-save", help="Save model parameters", action="store_true", dest="disable_save"
     )
+    parser.add_argument(
+        "-br", "--br-length", help="Number of updates to find best respond", type=int, default=100, dest="br_length"
+    )
 
     args, _ = parser.parse_known_args(cmd_args)
 

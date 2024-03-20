@@ -134,7 +134,7 @@ class GDmax:
 
 class NGDmax(GDmax):
 
-    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
+    def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_length: int = 100):
         self.obs_size = obs_size
         self.action_size = action_size
         self.env = env() # used to be env()
@@ -142,6 +142,7 @@ class NGDmax(GDmax):
 
         self.gamma = gamma
         self.rollout_length = rollout_length
+        self.br_length = br_length
         self.hl_dims = hl_dims
                 
         self.nash_gap = []
@@ -226,7 +227,7 @@ class NGDmax(GDmax):
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=False)
 
-        for i in range(100):
+        for i in range(self.br_length):
             self.update(adversary=True, adv_policy=temp_adv, adv_optimizer=temp_optimizer)
 
         return self.get_utility(adv_policy=temp_adv)[0]
@@ -236,19 +237,19 @@ class NGDmax(GDmax):
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=False)
 
-        for i in range(100):
+        for i in range(self.br_length):
             self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
 
         return self.get_utility(team_policy=temp_team)[1]
 
     def step(self):
-        for i in range(100):
+        for i in range(self.br_length):
             self.update()
 
         self.update(adversary=False)
     
     def step_with_gap(self):
-        for i in range(100):
+        for i in range(self.br_length):
             self.update()
 
         self.update(adversary=False)
@@ -266,8 +267,8 @@ class NGDmax(GDmax):
 
 
 class QGDmax(NGDmax):
-    def __init__(self, qtable, obs_size, action_size, env, eps_decay=0.005, min_eps=0.05, max_eps = 1, max_steps = 12, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50):
-        super().__init__(obs_size, action_size, env, hl_dims, lr, gamma, rollout_length)
+    def __init__(self, qtable, obs_size, action_size, env, eps_decay=0.005, min_eps=0.05, max_eps = 1, max_steps = 12, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_length: int = 100):
+        super().__init__(obs_size, action_size, env, hl_dims, lr, gamma, rollout_length, br_length)
         self.qpolicy = TabularQ(qtable, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env)
         self.adv_policy = self.qpolicy
         self.q_args = (qtable, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env)

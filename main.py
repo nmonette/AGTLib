@@ -25,7 +25,7 @@ def main(cmd_args=sys.argv[1:]):
             eval(team, adv)
    
         else:
-            alg = NREINFORCE(12,4, lambda: DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma)
+            alg = NREINFORCE(12,4, lambda: DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, br_length=args.br_length)
             train(alg, args)
 
     elif args.algorithm == "QREINFORCE":
@@ -41,7 +41,7 @@ def main(cmd_args=sys.argv[1:]):
 
         else:
             qtable = torch.zeros((dim, dim, 2, dim, dim, 2, dim ,dim, 2, 4))
-            alg = QREINFORCE(qtable, 12, 4, lambda: DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, hl_dims=args.net_arch)
+            alg = QREINFORCE(qtable, 12, 4, lambda: DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, hl_dims=args.net_arch, br_length=args.br_length)
             train(alg, args)
 
     else:
