@@ -40,7 +40,7 @@ class TabularQ:
             rewards = []
             for t in range(self.max_steps):
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.int)
                 team_action, _ = opponent_policy.get_actions(team_obs)
                 adv_action, _ = self.get_action(adv_obs)
                 adv_action = adv_action.item()
@@ -55,9 +55,8 @@ class TabularQ:
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                     break
-
-                new_adv_obs = adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.int)
-                prev = self.table[adv_obs][adv_action]
-                self.table[adv_obs][adv_action] = prev + self.lr * (reward + self.gamma * max(self.table[*new_adv_obs, v] - self.table[*adv_obs, adv_action] for v in range(self.table.shape[-1])))
-
+                
+                new_adv_obs = torch.tensor(new_obs[len(new_obs) - 1], device="cpu", dtype=torch.int)
+                prev = self.table[*adv_obs, adv_action]
+                self.table[*adv_obs, adv_action] = prev + self.lr * (reward + self.gamma * max(self.table[*new_adv_obs, v] - self.table[*adv_obs, adv_action] for v in range(self.table.shape[-1])))
                 obs = new_obs

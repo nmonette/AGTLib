@@ -10,7 +10,6 @@ from multigrid.utils.obs import gen_obs_grid_encoding
 
 import numpy as np
 
-
 class TeamEmptyEnv(TeamMultiGridEnv):
     """
     .. image:: https://i.imgur.com/wY0tT7R.gif
@@ -162,10 +161,10 @@ class TeamEmptyEnv(TeamMultiGridEnv):
         terminations):
         super().on_success(agent, rewards, terminations)
 
-        if self.goal1 == agent.state.pos:
+        if all(self.goal1 == agent.state.pos):
             self.goal1_terminated = True
         
-        if self.goal2 == agent.state.pos:
+        if all(self.goal2 == agent.state.pos):
             self.goal2_terminated = True
 
     def gen_obs(self, step=False):
@@ -211,8 +210,9 @@ class TeamEmptyEnv(TeamMultiGridEnv):
         :meta private:
         """
         # Generating all coordinates of the grid
-        coords = [(i,j) for i in range(1,width-1) for j in range(1,height-1)]
-        shuffle(coords)
+        coords = np.array([(i,j) for i in range(1,width-1) for j in range(1,height-1)])
+        
+        coords = coords[np.random.choice(len(coords), size=self.num_agents + 2, replace=False)]
         # Create an empty grid
         self.grid = Grid(width, height)
 
@@ -220,16 +220,18 @@ class TeamEmptyEnv(TeamMultiGridEnv):
         self.grid.wall_rect(0, 0, width, height)
         
         # Place a goal square in the bottom-right corner
-        self.goal1 = coords.pop()
-        self.goal2 = coords.pop()
+        self.goal1 = coords[0]
+        self.goal2 = coords[1]
         self.put_obj(Goal(), *self.goal1)
         self.put_obj(Goal(), *self.goal2)
 
         self.goal1_terminated = False
         self.goal2_terminated = False
 
+        self.agent_start_dir = 3
         # Place the agent
         for agent in self.agents:
+            self.agent_start_pos = coords[2 + agent.index]
             # Setting team colors
             if agent.index < self.num_agents - (self.num_agents // 2):
                 agent.state.color = "blue"

@@ -14,7 +14,7 @@ def parse_args(cmd_args=sys.argv[1:]):
         "-l", "--rollout-length", help="Number of rollout episodes", default=50, type=int, dest="rollout_length"
     )
     parser.add_argument(
-        "--lr", help="Learning rate", default = 0.1, type=float
+        "-lr", help="Learning rate", default = 0.1, type=float
     )
     parser.add_argument(
         "-g", "--gamma", help="Discount Factor", default = 0.99, type=float

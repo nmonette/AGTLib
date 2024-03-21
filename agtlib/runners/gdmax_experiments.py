@@ -38,19 +38,19 @@ def train(alg, args):
             plt.xlabel("Iterations")
             plt.ylabel("Nash Gap")
             plt.plot(range(0, len(alg.nash_gap)), alg.nash_gap)
-            plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-nashgap.png")
+            plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-nashgap.png")
             plt.close()
 
             # plt.xlabel("Iterations")
             # plt.ylabel("Team Utility against ADV BR")
             # plt.plot(range(0, len(alg.nash_gap)), alg.team_utility)
-            # plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-n-reinforce_experiment-team-rewards.png")
+            # plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-team-rewards.png")
             # plt.close()
 
         team = alg.team_policy
-        torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-team-policy-n-reinforce.pt")
+        torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-team-policy.pt")
         adv = alg.adv_policy if args.algorithm != "QREINFORCE" else alg
-        torch.save(adv.state_dict() if args.algorithm != "QREINFORCE" else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-adv-policy-n-reinforce.pt")
+        torch.save(adv.state_dict() if args.algorithm != "QREINFORCE" else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-adv-policy.pt")
     
     time_taken_sum = 0
     for i in range(args.iters):
@@ -65,7 +65,7 @@ def train(alg, args):
         time_taken_sum += time() - x
         time_remaining = (args.iters - i) * (time_taken_sum / (i+1))
         print(f"Estimated time remaining: {time_remaining // 3600}h {time_remaining % 3600 // 60}m {time_remaining % 60:.2f}s")
-        if i % args.save_interval == 0 and not args.disable_save:
+        if i % args.save_interval == 0  and i > 0 and not args.disable_save:
             # Save progress
             print("Saving progress...")
             save(i)

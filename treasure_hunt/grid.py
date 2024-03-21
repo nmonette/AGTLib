@@ -25,8 +25,7 @@ class Grid:
     terminations: list[bool, ]
     num_steps: int = 0
  
-    def __init__(self, dim:int, num_agents_t1:int, num_agents_t2:int, max_episode_steps:int = 12) -> None:
-        available_coord_pairs = [(i,j) for i in range(0,dim) for j in range(0,dim)]
+    def __init__(self, dim:int, available_coord_pairs: np.ndarray, num_agents_t1:int, num_agents_t2:int, max_episode_steps:int = 12) -> None:
         self.dim = dim
         self.num_agents_t1 = num_agents_t1
         self.num_agents_t2 = num_agents_t2
@@ -34,13 +33,15 @@ class Grid:
 
         self.max_episode_steps = max_episode_steps
 
+        coords = available_coord_pairs[np.random.choice(len(available_coord_pairs), (2 + self.num_agents_t1 + self.num_agents_t2), replace=False)]
+
         # idxs = [i for i in range()]
-        goal_1 = random.choice(available_coord_pairs)
+        goal_1 = coords[0]
         # print(available_coord_pairs)
-        available_coord_pairs.remove(goal_1)
-        goal_2 = random.choice(available_coord_pairs)
+        # available_coord_pairs.remove(goal_1)
+        goal_2 = coords[1]
         # print(available_coord_pairs)
-        available_coord_pairs.remove(goal_2)
+        # available_coord_pairs.remove(goal_2)
         # print(available_coord_pairs)
         
         self.place_goals(goal_1, goal_2)
@@ -48,8 +49,8 @@ class Grid:
         self.goal1_terminated = False
         self.goal2_terminated = False
 
-        team_1_agents = [random.choice(available_coord_pairs) for i in range(self.num_agents_t1)]
-        team_2_agents = [random.choice(available_coord_pairs) for i in range(self.num_agents_t2)]
+        team_1_agents = coords[2: self.num_agents_t1 + 2]
+        team_2_agents = coords[self.num_agents_t1 + 2: self.num_agents_t1 + self.num_agents_t2 + 2]
         self.place_agents(team_1_agents, team_2_agents)
 
         self.done = {i:False for i in range(self.num_agents_t1 + self.num_agents_t2)}
@@ -86,14 +87,14 @@ class Grid:
                 pass
 
             reward = 1 # can be changed if reward should be changed (e.g. discounted based on number of steps)
-            if locations[i] == self.goal_locations[0] and not self.goal1_terminated:
+            if all(locations[i] == self.goal_locations[0]) and not self.goal1_terminated:
                 self.terminations[i] = True
                 self.goal1_terminated = True
                 for j in range(self.num_agents_t1):
                     rewards[j] += reward * (1 if team else -1)
                 for j in range(self.num_agents_t1, self.num_agents_t1 + self.num_agents_t2):
                     rewards[j] += reward * (-1 if team else 1)
-            elif locations[i] == self.goal_locations[1] and not self.goal2_terminated:
+            elif all(locations[i] == self.goal_locations[1]) and not self.goal2_terminated:
                 self.terminations[i] = True
                 self.goal2_terminated = True
                 for j in range(self.num_agents_t1):

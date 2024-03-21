@@ -14,6 +14,7 @@ class TeamEmptyEnv(gym.Env):
         self.max_episode_steps = max_episode_steps
         self.num_agents_t1 = num_agents_t1
         self.num_agents_t2 = num_agents_t2
+        self.available_coord_pairs = np.array([(i,j) for i in range(0,dim) for j in range(0,dim)])
 
         self.observation_space = gym.spaces.MultiDiscrete([dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2])
         self.action_space = gym.spaces.Discrete(4)
@@ -27,7 +28,7 @@ class TeamEmptyEnv(gym.Env):
         return {i:obs for i in range(self.num_agents_t1+self.num_agents_t2)}, rewards, done, trunc, {}
 
     def reset(self, *args, **kargs) -> tuple[np.ndarray, dict[str, Any]]:
-        self.grid = Grid(self.dim, self.num_agents_t1, self.num_agents_t2)
+        self.grid = Grid(self.dim, self.available_coord_pairs, self.num_agents_t1, self.num_agents_t2)
         obs = self.grid.get_state()
         return {i:obs for i in range(self.num_agents_t1+self.num_agents_t2)}, {}
 

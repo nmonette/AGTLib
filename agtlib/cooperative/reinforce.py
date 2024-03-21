@@ -17,7 +17,7 @@ class GDmax:
         self.rollout_length = rollout_length
         self.hl_dims = hl_dims
         
-        self.adv_policy = SELUPolicy(obs_size - 3, action_size, hl_dims.copy())
+        self.adv_policy = SELUPolicy(obs_size - 4, action_size, hl_dims.copy())
         # self.adv_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-adv-policy-n-reinforce.pt"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=False)
         self.param_dims = param_dims
@@ -148,7 +148,7 @@ class NGDmax(GDmax):
         self.nash_gap = []
         self.team_utility = []
 
-        self.adv_policy = SELUPolicy(obs_size - 3, action_size, hl_dims.copy())
+        self.adv_policy = SELUPolicy(obs_size - 4, action_size, hl_dims.copy())
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=False)
 
         self.team_policy = SELUMAPolicy(obs_size, action_size * action_size, [(i,j) for i in range(4) for j in range(4)], hl_dims=hl_dims.copy())
@@ -223,7 +223,7 @@ class NGDmax(GDmax):
         # policy = policy.to("cpu")
 
     def get_adv_br(self):
-        temp_adv = SELUPolicy(self.obs_size - 3, self.action_size, hl_dims=self.hl_dims.copy())
+        temp_adv = SELUPolicy(self.obs_size - 4, self.action_size, hl_dims=self.hl_dims.copy())
         temp_adv.load_state_dict(self.adv_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_adv.parameters(), lr=self.lr, maximize=False)
 

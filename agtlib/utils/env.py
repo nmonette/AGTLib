@@ -77,12 +77,12 @@ class DecentralizedMGWrapper(gym.Wrapper):
     def reset(self, *args, **kwargs):
         obs, _ = self.env.reset()
         obs = obs[0]
-        return {0: obs[[i for i in range(len(obs) - 9)] + [i for i in range(len(obs) - 6, len(obs))]], 1: obs[len(obs) - 9:]}, _
+        return {0: obs[[i for i in range(len(obs) - 9)] + [i for i in range(len(obs) - 6, len(obs))]], 1: obs[[i for i in range(len(obs) - 9, len(obs)) if i != len(obs) - 7]]}, _
     
     def step(self, action: dict):
         obs, reward, done, trunc, _ = self.env.step(action)
         obs = obs[0]
-        obs = {0: obs[[i for i in range(len(obs) - 9)] + [i for i in range(len(obs) - 6, len(obs))]], 1: obs[len(obs) - 9:]}
+        obs = {0: obs[[i for i in range(len(obs) - 9)] + [i for i in range(len(obs) - 6, len(obs))]], 1: obs[[i for i in range(len(obs) - 9, len(obs)) if i != len(obs) - 7]]}
     
         if isinstance(trunc, bool):
             trunc = {i: trunc for i in range(len(obs))}
