@@ -15,7 +15,10 @@ def eval(team, adv, args):
         env.render()
         while True:
             team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32).reshape(-1, len(obs[len(obs) - 1]))
+            if args.algorithm == "PREINFORCE":
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32).reshape(-1, len(obs[len(obs) - 1]))
+            else:
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32) 
             team_action = team.get_actions(team_obs)[0]
             adv_action = adv.get_action(adv_obs)[0]
             adv_action = adv_action.item()

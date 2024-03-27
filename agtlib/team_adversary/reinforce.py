@@ -436,7 +436,7 @@ class PGDmax(NGDmax):
         
     def get_adv_br(self):
         temp_adv = PPO(**self.ppo_args)
-        temp_adv.learn(10000, opponent_policy=self.team_policy)
+        temp_adv.learn(50000, opponent_policy=self.team_policy)
 
         return self.get_utility(adv_policy=temp_adv.policy)[0]
 
@@ -451,7 +451,7 @@ class PGDmax(NGDmax):
         return self.get_utility(team_policy=temp_team)[1]
 
     def step(self):
-        self.ppo.learn(total_timesteps=10000, opponent_policy=self.team_policy)
+        self.ppo.learn(total_timesteps=50000, opponent_policy=self.team_policy)
 
         self.update(adversary=False)
 
@@ -459,7 +459,7 @@ class PGDmax(NGDmax):
         """
         GDmax training step with the nash-gap metric.
         """
-        self.ppo.learn(total_timesteps=10000, opponent_policy=self.team_policy)
+        self.ppo.learn(total_timesteps=50000, opponent_policy=self.team_policy)
 
         self.update(adversary=False)
 

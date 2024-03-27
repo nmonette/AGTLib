@@ -73,9 +73,10 @@ class DecentralizedMGWrapper(gym.Wrapper):
             Simulation environment.
         """
         self.env = env
+        dim = env.unwrapped.grid_size -2 
 
         # Set for adversary in stable_baselines GDmax
-        self.observation_space = gym.spaces.Dict({0:gym.spaces.MultiDiscrete([3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2]), 1: gym.spaces.MultiDiscrete([3, 3, 3, 3, 2, 3, 3, 2])})
+        self.observation_space = gym.spaces.Dict({0:gym.spaces.MultiDiscrete([dim, dim, 2, dim, dim, 2, dim, dim, 2, dim, dim, 2]), 1: gym.spaces.MultiDiscrete([dim, dim, dim, dim, 2, dim, dim, 2])})
         self.action_space = gym.spaces.Discrete(4)
     
     def reset(self, *args, **kwargs):

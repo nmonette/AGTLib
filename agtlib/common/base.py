@@ -136,7 +136,8 @@ class SELUPolicy(nn.Module):
         torch.Tensor
             Probability vector containing the action-probabilities.
         """
-        obs_space = np.array([3,3,3,3,2,3,3,2])
+        dim = 4
+        obs_space = np.array([dim,dim,dim,dim,2,dim,dim,2])
         obs = x.reshape(-1, len(obs_space))
         obs = torch.cat(
             [
@@ -526,7 +527,8 @@ class SELUMAPolicy(nn.Module):
         """
         # if isinstance(x, np.ndarray):
         #     x = torch.tensor(x, dtype=torch.float)
-        obs_space = np.array([3,3,2,3,3,2,3,3,2,3,3,2])
+        dim = 4
+        obs_space = np.array([dim,dim,2, dim,dim,2,dim,dim,2,dim,dim,2])
         obs = x.reshape(-1, len(obs_space))
         obs = torch.cat(
             [

@@ -56,8 +56,8 @@ def parse_args(cmd_args=sys.argv[1:]):
         "-dim", "--grid-dimension", help="Grid dimension", type=int, default=3, dest="dim"
     )
     parser.add_argument(
-        "-f", "--fix-grid", help="Fix grid configuration", action="store_const", const="MultiGrid-Empty-3x3-TeamWins", default= "MultiGrid-Empty-3x3-Team", dest="env"
-    )
+        "-f", "--fix-grid", help="Fix grid configuration", action="store_const", const="MultiGrid-Empty-3x3-SameStart", default= "MultiGrid-Empty-3x3-Team", dest="env"
+    ) # const = "MultiGrid-Empty-3x3-TeamWins"
 
     args, _ = parser.parse_known_args(cmd_args)
 
