@@ -1,8 +1,36 @@
+from typing import Tuple
+
 import torch
-import matplotlib.pyplot as plt
+import gymnasium as gym
 
 class TabularQ:
-    def __init__(self, table, eps_decay, min_eps, max_eps, lr, gamma, rollout_length, max_steps, env, inti_epsilon=1):
+    """
+    Policy for Tabular Q-learning (SARSA). Uses an epsilon-greedy policy. 
+    """
+    def __init__(self, table: torch.Tensor, eps_decay: float, min_eps: float, max_eps: float, lr: float, gamma: float, rollout_length: int, env:gym.Env, inti_epsilon: float=1):
+        """
+        Parameters
+        ----------
+        table: torch.Tensor
+            The Q-table to be learned. Can pass in a pre-learned one as well for evaluation purposes. 
+        eps_decay: float
+            The decay rate of decay for $\epsilon$.
+        min_eps: float
+            The minimum value for $\epsilon$$
+        max_eps: float
+            The minimum value for $\epsilon$$
+        lr: float
+            The learning rate
+        gamma: float
+            The discount factor
+        rollout_length: int
+            The number of rollout episodes done per training cycle. 
+        env: gym.Env
+            The environment to be trained on
+        init_epsilon: float, optional
+            The initial epsilon to be used. Defaults to 1 but can be set to 0 for evaluation. 
+        """
+        
         self.table = table
 
         self.min_eps = min_eps
@@ -17,11 +45,24 @@ class TabularQ:
 
         self.env = env()
 
-        self.max_steps = max_steps
 
         self.dist = torch.distributions.Uniform(0, 1)
 
-    def get_action(self, obs):
+    def get_action(self, obs) -> Tuple[torch.Tensor, None]:
+        """
+        Samples an action from the current policy and returns it as an integer index.
+        Parameters
+        ----------
+        x: torch.Tensor
+            The flattened observation of the agent(s).
+        Returns
+        -------
+        int
+            The integer index of the action samples from the policy.
+        None
+            Returns an extra item to fit the return signature of the rest of the library. 
+            Typically would be reserved for the log-prob of the action. 
+        """
         obs = obs.to(torch.int)
         if self.epsilon < self.dist.sample():
             action = torch.argmin(self.table[*obs, :])
@@ -31,6 +72,12 @@ class TabularQ:
         
     
     def train(self, opponent_policy):
+        """
+        Learns the Q-table with the opponent's policy fixed. 
+
+        opponent_policy: torch.nn.Module
+            a policy that has `get_actions` and `action_map`
+        """
         reward_means = []
         for episode in range(self.rollout_length):
             self.epsilon = self.min_eps + (self.max_eps - self.min_eps)*torch.exp(torch.tensor(-self.eps_decay*episode))
@@ -38,7 +85,7 @@ class TabularQ:
             obs, _ = self.env.reset()
             done = False
             rewards = []
-            for t in range(self.max_steps):
+            while True:
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.int)
                 team_action, _ = opponent_policy.get_actions(team_obs)

@@ -1,7 +1,7 @@
 from time import sleep
 import torch
-from agtlib.cooperative.lambda_pg import TwoHeadPolicy
-from agtlib.cooperative.pg import MAPolicyNetwork
+from agtlib.team_adversary.lambda_pg import TwoHeadPolicy
+from agtlib.common.base import MAPolicyNetwork
 from agtlib.utils.env import MultiGridWrapper
 import multiprocessing as mp
 import warnings
@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from gymnasium import register
 import multigrid
-from agtlib.cooperative.base import PolicyNetwork
+from agtlib.common.base import PolicyNetwork
 from agtlib.cooperative.ppo import IPPO, PPO
 from agtlib.runners.gdmax_experiments_old import grid_experiment_3x3, lgdmax_grid_experiment, nlgdmax_grid_experiment# ,mpe_experiment
 from agtlib.utils.env import (MultiGridWrapper, SingleAgentEnvWrapper,
@@ -37,7 +37,7 @@ def test_lgdmax_weights():
     team.load_state_dict(torch.load("./output/4500-3x3-team-policy-final-nlambda.pt"))
     adv.load_state_dict(torch.load("./output/4500-3x3-adv-policy-final-nlambda.pt"))
 
-    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, render_mode="human"))
+    env = MultiGridWrapper(gym.make("MultiGrid-Empty-3x3-TeamWins", agents=3, render_mode="human"))
     for episode in range(100):
         obs, _ = env.reset()
         env.render()

@@ -9,6 +9,7 @@ from multigrid.core.world_object import Goal
 from multigrid.utils.obs import gen_obs_grid_encoding
 
 import numpy as np
+import gymnasium as gym
 
 class TeamEmptyEnv(TeamMultiGridEnv):
     """
@@ -110,7 +111,7 @@ class TeamEmptyEnv(TeamMultiGridEnv):
     * ``MultiGrid-Empty-8x8-v0``
     * ``MultiGrid-Empty-16x16-v0``
     """
-
+    observation_space = gym.spaces.Discrete(15)
     def __init__(
         self,
         size: int = 8,
@@ -246,7 +247,19 @@ class TeamEmptyEnv(TeamMultiGridEnv):
 
 
 class TeamWins(TeamEmptyEnv):
-     def _gen_grid(self, width, height):
+    # observation_space = gym.spaces.Dict({
+    #     0: gym.spaces.Discrete(15),
+    #     1: gym.spaces.Discrete(15),
+    #     2: gym.spaces.Discrete(15)
+    # })
+    action_space = gym.spaces.Dict({
+        0: gym.spaces.Discrete(4),
+        1: gym.spaces.Discrete(4),
+        2: gym.spaces.Discrete(4)
+    })
+
+    observation_space = gym.spaces.MultiDiscrete([3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2])
+    def _gen_grid(self, width, height):
         """
         :meta private:
         """
@@ -263,16 +276,16 @@ class TeamWins(TeamEmptyEnv):
         # self.goal1 = coords.pop()
         # self.goal2 = coords.pop()
 
-        self.goal1 = (1,1)
-        self.goal2 = (width-2, height-2)
+        self.goal1 = np.array((1,1))
+        self.goal2 = np.array((width-2, height-2))
         self.put_obj(Goal(), *self.goal1)
         self.put_obj(Goal(), *self.goal2)
 
         self.goal1_terminated = False
         self.goal2_terminated = False
 
-        self.agent_start_pos = (1,1)
-        self.agent_start_dir = (1,1) 
+        self.agent_start_pos = np.array((1,1))
+        self.agent_start_dir = np.array((1,1))
 
         self.allow_agent_overlap = True
 

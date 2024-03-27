@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import gymnasium as gym
 
-from .base import RLBase, PolicyNetwork, ValueNetwork, ActorCritic
+from ..common.base import RLBase, PolicyNetwork, ValueNetwork, ActorCritic
 from ..utils.rollout import RolloutBuffer, RolloutManager
 
 from agtlib.utils.stable_baselines.vec_env.base_vec_env import VecEnv
@@ -127,7 +127,7 @@ class PPO(RLBase):
         policy_params = nn.utils.parameters_to_vector(self.policy.parameters())
         value_params = nn.utils.parameters_to_vector(self.value.parameters())
         self.actor_critic = ActorCritic(self.policy, self.value)
-        self.optimizer = torch.optim.Adam(self.actor_critic.parameters(), eps=1e-5) # can make it so that there are other compatible optimizers in the future
+        self.optimizer = torch.optim.Adam(self.actor_critic.parameters(), eps=1e-5, lr=0.01) # can make it so that there are other compatible optimizers in the future
 
     def preprocess(self, obs: torch.Tensor):
         '''
@@ -274,7 +274,7 @@ class PPO(RLBase):
                 break
 
 def train_ppo():
-    ppo = PPO(2, 4, policy_hl_dims=[16], value_hl_dims=[16])
+    ppo = PPO(2, 4, policy_hl_dims=[30], value_hl_dims=[30, 40])
 
     def create_env():
         env = Monitor(gym.make("CartPole-v1"))
@@ -283,8 +283,9 @@ def train_ppo():
 
     multi_env = SubprocVecEnv([create_env for _ in range(10)])
     next_obs = multi_env.reset()
-    for epoch in range(100):
-        rollout = RolloutManager(5, multi_env, [ppo.policy], [ppo.value], "PPO", n_envs=10)
+    for epoch in range(10):
+        print("epoch:", epoch + 1)
+        rollout = RolloutManager(100, multi_env, [ppo.policy], [ppo.value], n_envs=10)
         buffer, next_obs = rollout.rollout(next_obs)
         buffer = buffer[0]
 

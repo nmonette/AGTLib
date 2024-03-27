@@ -4,7 +4,7 @@ Some utility objects that will be used, as well as
 base classes to inherit from.
 """
 
-from typing import Iterable, DefaultDict
+from typing import Iterable, DefaultDict, List
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -73,21 +73,33 @@ class PolicyNetwork(nn.Module):
             The log probability of the returned action with reference to the current policy.
         """
 
-        dist = torch.distributions.Categorical(logits=self.forward(x))
+        dist = torch.distributions.Categorical(logits=self.__call__(x))
         action = dist.sample()
         log_prob = dist.log_prob(action)
 
         return action, log_prob
     
     def evaluate_actions(self, obs: torch.tensor, actions: torch.tensor):
-        dist = torch.distributions.Categorical(logits=(self.forward(obs)))
+        """
+        Passes observation through the network and then returns
+        the log probability of taking that action at the current state
+        of the network. 
+        Parameters
+        ----------
+        obs: torch.Tensor
+            The flattened observation(s).
+        actions: torch.Tensor
+            The actions to evaluate. 
+        """
+        dist = torch.distributions.Categorical(logits=(self.__call__(obs)))
         return dist.log_prob(actions)
     
 class SELUPolicy(nn.Module):
     """
     Feedforward neural network that serves
     as a function approximation of the 
-    policy gradient.
+    policy gradient. Uses SELU Activation 
+    Functions. 
     """
     def __init__(self, obs_size: int, action_size: int, hl_dims: Iterable[int, ] = [64, 128]) -> None:
         """
@@ -124,6 +136,15 @@ class SELUPolicy(nn.Module):
         torch.Tensor
             Probability vector containing the action-probabilities.
         """
+        obs_space = np.array([3,3,3,3,2,3,3,2])
+        obs = x.reshape(-1, len(obs_space))
+        obs = torch.cat(
+            [
+                torch.nn.functional.one_hot(obs_.long(), num_classes=int(obs_space[idx])).float()
+                for idx, obs_ in enumerate(torch.split(obs.long(), 1, dim=1))
+            ],
+            dim=-1,
+        ).view(obs.shape[0], sum(obs_space))
         for i in range(len(self.layers) - 1):
             x = self.selu(self.layers[i](x))
         return self.layers[-1](x)
@@ -143,14 +164,25 @@ class SELUPolicy(nn.Module):
             The log probability of the returned action with reference to the current policy.
         """
 
-        dist = torch.distributions.Categorical(logits=self.forward(x))
+        dist = torch.distributions.Categorical(logits=self.__call__(x))
         action = dist.sample()
         log_prob = dist.log_prob(action)
 
         return action, log_prob
     
     def evaluate_actions(self, obs: torch.tensor, actions: torch.tensor):
-        dist = torch.distributions.Categorical(logits=(self.forward(obs)))
+        """
+        Passes observation through the network and then returns
+        the log probability of taking that action at the current state
+        of the network. 
+        Parameters
+        ----------
+        obs: torch.Tensor
+            The flattened observation(s).
+        actions: torch.Tensor
+            The actions to evaluate. 
+        """
+        dist = torch.distributions.Categorical(logits=(self.__call__(obs)))
         return dist.log_prob(actions)
 
 
@@ -320,7 +352,7 @@ class ActorCritic(nn.Module):
         self.value = value
     
     def forward(self, x):
-        return self.policy.forward(x), self.value.forward(x)
+        return self.policy.__call__(x), self.value.__call__(x)
     
 class ActorCriticCTDE(nn.Module):
     """
@@ -333,8 +365,216 @@ class ActorCriticCTDE(nn.Module):
         self.value = value
     
     def forward(self, x):
-        return *[policy.forward(x) for policy in range(len(self.policies))], self.value.forward(x)
+        return *[policy.__call__(x) for policy in range(len(self.policies))], self.value.__call__(x)
     
+class SoftmaxPolicy(nn.Module):
+    """
+    Policy that uses a softmax parameterization, i.e. 
+    $$ \pi(a | s) = \frac{e^{\theta_{a, s}}}{\sum_{a'} \theta_{a', s}}
+    """
+    def __init__(self, n_agents, n_actions, param_dims, lr= 0.01, action_map=None):
+        super(SoftmaxPolicy, self).__init__()
+        self.lr = lr
+
+        self.n_agents = n_agents
+        self.n_actions = n_actions
+        self.param_dims = param_dims
+
+        self.action_map = action_map
+
+        empty = torch.empty(*param_dims)
+        nn.init.orthogonal_(empty)
+        self.params = nn.Parameter(nn.Softmax()(empty), requires_grad=True)
+        
+
+    def forward(self, x):
+        # [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16]
+        return self.params[*x, :]
+
+    def get_actions(self, x):
+        dist = torch.distributions.Categorical(self.__call__(x)) # make categorical distribution and then decode the action index
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        if self.action_map is not None:
+            return self.action_map[action], log_prob
+        else:
+            return action, log_prob
+    
+    def step(self, loss):
+        loss.backward(inputs=(self.params,)) # inputs=(self.params,)
+
+        x = self.params + self.lr * self.params.grad
+        self.params.grad.zero_()
+        self.params.data = nn.Softmax()(x)
+
+class MAPolicyNetwork(nn.Module):
+    def __init__(self, obs_size: int, action_size: int, action_map: List[List[int, ]], hl_dims: Iterable[int, ] = [64, 128]) -> None:
+        """
+        Parameters
+        ----------
+        obs_size: int
+            The length of the flattened observation of the agent(s). 
+        action_size: int
+            The cardinality of the action space of a single agent. 
+        hl_dims: Iterable(int), optional
+            An iterable such that the ith element represents the width of the ith hidden layer. 
+            Defaults to `[64,128]`. Note that this does not include the input or output layers.
+        """
+        super(MAPolicyNetwork, self).__init__()
+        prev_dim = obs_size 
+        hl_dims.append(action_size)
+        self.layers = nn.ModuleList()
+        for i in range(len(hl_dims)):
+            self.layers.append(nn.Linear(prev_dim, hl_dims[i]))
+            prev_dim = hl_dims[i]
+
+        self.action_map = action_map
+        # self.lookup_table = torch.cumsum(torch.ones((len(action_map), ), dtype=int), 0).reshape((int(np.sqrt(action_size)), int(np.sqrt(action_size)))) - 1
+        self.relu = torch.nn.ReLU()
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Performs the forward pass of the neural network.
+        Parameters
+        ----------
+        x: torch.Tensor
+            The flattened observation of the agent(s).
+
+        Returns
+        -------
+        torch.Tensor
+            Probability vector containing the action-probabilities.
+        """
+        # if isinstance(x, np.ndarray):
+        #     x = torch.tensor(x, dtype=torch.float)
+        for i in range(len(self.layers) - 1):
+            x = self.relu(self.layers[i](x))
+        return self.layers[-1](x)
+
+    def get_actions(self, x: torch.Tensor) -> int:
+        """
+        Samples an action from the current policy and returns it as an integer index.
+        Parameters
+        ----------
+        x: torch.Tensor
+            The flattened observation of the agent(s).
+        Returns
+        -------
+        int
+            The integer index of the action samples from the policy.
+        float
+            The log probability of the returned action with reference to the current policy.
+        """
+
+        dist = torch.distributions.Categorical(logits=self.__call__(x))
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        return action, log_prob # self.action_map[action], log_prob
+    
+    def evaluate_actions(self, obs: torch.tensor, actions: torch.tensor):
+        """
+        Passes observation through the network and then returns
+        the log probability of taking that action at the current state
+        of the network. 
+        Parameters
+        ----------
+        obs: torch.Tensor
+            The flattened observation(s).
+        actions: torch.Tensor
+            The actions to evaluate. 
+        """
+        dist = torch.distributions.Categorical(logits=(self.__call__(obs)))
+        return dist.log_prob(actions)
+    
+class SELUMAPolicy(nn.Module):
+    def __init__(self, obs_size: int, action_size: int, action_map: List[List[int, ]], hl_dims: Iterable[int, ] = [64, 128]) -> None:
+        """
+        Parameters
+        ----------
+        obs_size: int
+            The length of the flattened observation of the agent(s). 
+        action_size: int
+            The cardinality of the action space of a single agent. 
+        hl_dims: Iterable(int), optional
+            An iterable such that the ith element represents the width of the ith hidden layer. 
+            Defaults to `[64,128]`. Note that this does not include the input or output layers.
+        """
+        super(SELUMAPolicy, self).__init__()
+        prev_dim = obs_size 
+        hl_dims.append(action_size)
+        self.layers = nn.ModuleList()
+        for i in range(len(hl_dims)):
+            self.layers.append(nn.Linear(prev_dim, hl_dims[i]))
+            prev_dim = hl_dims[i]
+
+        self.action_map = action_map
+        # self.lookup_table = torch.cumsum(torch.ones((len(action_map), ), dtype=int), 0).reshape((int(np.sqrt(action_size)), int(np.sqrt(action_size)))) - 1
+        self.selu = torch.nn.SELU()
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Performs the forward pass of the neural network.
+        Parameters
+        ----------
+        x: torch.Tensor
+            The flattened observation of the agent(s).
+
+        Returns
+        -------
+        torch.Tensor
+            Probability vector containing the action-probabilities.
+        """
+        # if isinstance(x, np.ndarray):
+        #     x = torch.tensor(x, dtype=torch.float)
+        obs_space = np.array([3,3,2,3,3,2,3,3,2,3,3,2])
+        obs = x.reshape(-1, len(obs_space))
+        obs = torch.cat(
+            [
+                torch.nn.functional.one_hot(obs_.long(), num_classes=int(obs_space[idx])).float()
+                for idx, obs_ in enumerate(torch.split(obs.long(), 1, dim=1))
+            ],
+            dim=-1,
+        ).view(obs.shape[0], sum(obs_space))
+        for i in range(len(self.layers) - 1):
+            x = self.selu(self.layers[i](x))
+        return self.layers[-1](x)
+
+    def get_actions(self, x: torch.Tensor) -> int:
+        """
+        Samples an action from the current policy and returns it as an integer index.
+        Parameters
+        ----------
+        x: torch.Tensor
+            The flattened observation of the agent(s).
+        Returns
+        -------
+        int
+            The integer index of the action samples from the policy.
+        float
+            The log probability of the returned action with reference to the current policy.
+        """
+
+        dist = torch.distributions.Categorical(logits=self.__call__(x))
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        return action, log_prob # self.action_map[action], log_prob
+    
+    def evaluate_actions(self, obs: torch.tensor, actions: torch.tensor):
+        """
+        Passes observation through the network and then returns
+        the log probability of taking that action at the current state
+        of the network. 
+        Parameters
+        ----------
+        obs: torch.Tensor
+            The flattened observation(s).
+        actions: torch.Tensor
+            The actions to evaluate. 
+        """
+        dist = torch.distributions.Categorical(logits=(self.__call__(obs)))
+        return dist.log_prob(actions)
+
+
 class RLBase(ABC):
     """
     Base class for RL models to override.

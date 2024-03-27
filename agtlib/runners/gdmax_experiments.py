@@ -7,17 +7,17 @@ import torch
 import gymnasium as gym
 import matplotlib.pyplot as plt
 
-def eval(team, adv):
-    env = DecentralizedMGWrapper(gym.make("MultiGrid-Empty-3x3-Team", agents=3, disable_env_checker=True, render_mode="human"))
+def eval(team, adv, args):
+    env = DecentralizedMGWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))
 
     for episode in range(100):
         obs, _ = env.reset()
         env.render()
         while True:
             team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, _ = team.get_actions(team_obs)
-            adv_action, _ = adv.get_action(adv_obs)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32).reshape(-1, len(obs[len(obs) - 1]))
+            team_action = team.get_actions(team_obs)[0]
+            adv_action = adv.get_action(adv_obs)[0]
             adv_action = adv_action.item()
             team_translated = team.action_map[team_action]
             action = {}
@@ -26,7 +26,7 @@ def eval(team, adv):
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
             print(action, reward)
-            sleep(0.5)
+            sleep(1.5)
             if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                 break
 
@@ -53,9 +53,9 @@ def train(alg, args):
         torch.save(adv.state_dict() if args.algorithm != "QREINFORCE" else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-adv-policy.pt")
     
     time_taken_sum = 0
-    for i in range(args.iters):
+    for i in range(1, args.iters + 1):
         x = time()
-        if args.nash_gap and i % args.metric_interval == 0: 
+        if args.nash_gap and (i % args.metric_interval == 0 or i == 1): 
             alg.step_with_gap()
             print(f"Nash Gap: {alg.nash_gap[-1]:.6f}")
         else:

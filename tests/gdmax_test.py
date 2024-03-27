@@ -4,8 +4,8 @@ import gymnasium as gym
 import torch
 import matplotlib.pyplot as plt
 
-from agtlib.cooperative.pg import GDmax, SoftmaxPolicy
-from agtlib.cooperative.base import PolicyNetwork
+from agtlib.team_adversary.pg import GDmax
+from agtlib.common.base import PolicyNetwork, SoftmaxPolicy
 from agtlib.utils.env import MultiGridWrapper
 
 

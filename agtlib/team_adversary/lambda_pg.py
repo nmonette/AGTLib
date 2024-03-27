@@ -1,6 +1,5 @@
 """
-We need to figure out which feature mapping
-gets optimized with which network... oops
+File is deprecated. 
 """
 from typing import Iterable
 
@@ -8,8 +7,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from .base import RLBase, PolicyNetwork
-from .pg import MAPolicyNetwork
+from agtlib.common.base import RLBase, PolicyNetwork, MAPolicyNetwork
 
 class TwoHeadPolicy(nn.Module):
     """
@@ -181,7 +179,7 @@ class NLGDmax:
             self.lambda_optimizer.zero_grad()
             
             policy_features = self.adv_policy.forward_init(init_data)
-            predictions = self.lambda_network.forward(policy_features)
+            predictions = self.lambda_network.__call__(policy_features)
 
             
             loss = nn.MSELoss()(predictions, lambda_data)
@@ -299,7 +297,7 @@ class NLGDmax:
         for i in range(self.rollout_length):
             self.adv_optimizer.zero_grad()
             policy_features = self.adv_policy.forward_init(init_data[i])
-            loss = torch.dot(self.lambda_network.forward(policy_features), reward_vec[i])
+            loss = torch.dot(self.lambda_network.__call__(policy_features), reward_vec[i])
             loss.backward()
             self.adv_optimizer.step()
 
@@ -317,7 +315,7 @@ class NLGDmax:
         for i in range(self.rollout_length):
             self.adv_optimizer.zero_grad()
             policy_features = self.adv_policy.forward_init(init_data[i])
-            loss = torch.dot(self.lambda_network.forward(policy_features), reward_vec[i])
+            loss = torch.dot(self.lambda_network.__call__(policy_features), reward_vec[i])
             loss.backward()
             self.adv_optimizer.step()
             

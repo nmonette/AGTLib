@@ -32,19 +32,33 @@ There are many arguments, but here are the highlights:
     6. `-na w1,w2,...` gives hidden network architecture
 - Eval Mode:
     1. `-e` enables eval mode
-    2. `-adv PATH` supplies path for adversarial policy
-    3. `-team PATH` supplies path for team policy 
-- Metrics:
+    2. `-de` disables post-training eval mode
+    3. `-adv PATH` supplies path for adversarial policy
+    4. `-team PATH` supplies path for team policy 
+- Metrics/Checkpoints:
     1. `-ds` disables checkpoint saving
     2. `-si NUM` sets interval for checkpoint saving
     3. `-ng` enables collection of Nash-Gap metric
     4. `-mi NUM` sets interval for collecting metrics
+- Environment
+    1. `-dim` sets grid dimension
+    2. `-f` fixes grid to single configuration 
+
 ## An example experiment:
 ``` 
 python -m main -a QREINFORCE -l 25000 -i 400 -ng
 ```
 
 # TO DO !
+# Flight goals:
+1. Write docstrings
+2. Fully implement PPO variants
+    - Write GDmax Experiment Using PPO
+3. Add PPO experiment to argparser
+4. Add customizability so that it works with multiple environments (i.e. action spaces etc. )
+5. Fix multigrid so that it doesn't require us to disable the env checker
+6. Write multigrid in pytorch
+7. Add Direct Parameterization for the team versus Q as the adversary.
 
 ## PPO (agt.cooperative.ppo)
 2. Add child classes to PPO (MAPPO, IPPO)

@@ -9,11 +9,11 @@ import torch
 import numpy as np
 # from pettingzoo.mpe import simple_adversary_v3
 
-from ..cooperative.base import PolicyNetwork
-from ..cooperative.pg import GDmax, LGDmax, NGDmax
-from ..cooperative.reinforce import GDmax as REINFORCE, NGDmax as NREINFORCE, QGDmax as QREINFORCE
-from ..cooperative.pg import MAPolicyNetwork, SoftmaxPolicy
-from ..cooperative.lambda_pg import NLGDmax, TwoHeadPolicy
+from ..common.base import PolicyNetwork
+from ..team_adversary.pg import GDmax, LGDmax, NGDmax
+from ..team_adversary.reinforce import GDmax as REINFORCE, NGDmax as NREINFORCE, QGDmax as QREINFORCE
+from ..team_adversary.pg import MAPolicyNetwork, SoftmaxPolicy
+from ..team_adversary.lambda_pg import NLGDmax, TwoHeadPolicy
 from ..utils.env import MultiGridWrapper
 
 # ray.init()
@@ -217,7 +217,7 @@ def n_reinforce_experiment():
             team_action, _ = team.get_actions(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
-            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
             team_translated = team.action_map[team_action]
             action = {}
             for i in range(len(team_translated)):
@@ -284,7 +284,7 @@ def reinforce_experiment():
             team_action, _ = team.get_actions(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
-            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
@@ -370,7 +370,7 @@ def gdmax_experiment():
         while True:
             team_action, _ = team.get_actions(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
-            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
@@ -430,7 +430,7 @@ def gdmax_experiment():
     #     while True:
     #         team_action, _ = team.get_actions(obs[0])
     #         adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
-    #         # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+    #         # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
     #         action = {i: team_action[i] for i in range(len(team_action))}
     #         action[len(action)] = adv_action.item()
     #         obs, reward, trunc, done, _ = env.step(action)
@@ -468,7 +468,7 @@ def lgdmax_grid_experiment():
             team_action, _ = team.get_actions(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
-            # print(torch.nn.Softmax()(adv.forward(torch.tensor(obs[0]).float())))
+            # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action
             obs, reward, trunc, done, _ = env.step(action)
