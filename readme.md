@@ -13,7 +13,11 @@ pip install -e .
 cd ..
 pip install -r requirements.txt
 ```
-4. Unzip "3x3-3-agents-table.npy.zip" into the root directory 
+4. Install stable_baselines3 modifications
+```py
+cd stable-baselines3
+pip install -e .
+```
 5. Run experiments:
 ```py
 python -m main
@@ -23,6 +27,7 @@ There are many arguments, but here are the highlights:
 - Adversarial Algorithm Selection
     1. `-a NREINORCE` uses deep REINFORCE
     2. `-a QREINFORCE` uses SARSA
+    3. `-a PREINFORCE` uses PPO
 - Hyperparameters
     1. `-i NUM_ITERATIONS`
     2. `-l NUM_EPISODES_PER_ITER`

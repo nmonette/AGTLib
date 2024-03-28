@@ -8,6 +8,7 @@ from agtlib.team_adversary.q import TabularQ
 from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper
 from agtlib.cooperative.ppo import train_ppo
 
+from stable_baselines3 import PPO
 import gymnasium as gym
 import torch
 import multigrid.multigrid.envs
@@ -66,16 +67,26 @@ def main(cmd_args=sys.argv[1:]):
                 eval(alg.team_policy, eval_adv, args)
 
     elif args.algorithm == "PREINFORCE":
-        alg = PREINFORCE(12,4, lambda: DecentralizedMGWrapper(gym.make(args.env, agents=3, disable_env_checker=True, size=args.dim + 2)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, br_length=args.br_length, hl_dims=args.net_arch)
-        if args.team is not None:
-            alg.team_policy.load_state_dict(torch.load(args.team))
-        if args.adv is not None:
-            alg.adv_policy.load_state_dict(torch.load(args.adv))
+        if args.eval:
+            team = SELUMAPolicy(12, 16, [(i,j) for i in range(4) for j in range(4)], hl_dims=args.net_arch) 
+            team.load_state_dict(torch.load(args.team))
 
-        train(alg, args)
+            adv = PPO(policy="MlpPolicy", env=DecentralizedMGWrapper(gym.make(args.env,  agents=3, size = args.dim + 2, disable_env_checker=True)), gdmax=True, monitor_wrapper=False).policy
+            adv.load_state_dict(torch.load(args.adv))
 
-        if not args.disable_eval:
-            eval(alg.team_policy, alg.adv_policy, args)
+            eval(team, adv, args)
+
+        else:
+            alg = PREINFORCE(12,4, lambda: DecentralizedMGWrapper(gym.make(args.env, agents=3, disable_env_checker=True, size=args.dim + 2)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, br_length=args.br_length, hl_dims=args.net_arch)
+            if args.team is not None:
+                alg.team_policy.load_state_dict(torch.load(args.team))
+            if args.adv is not None:
+                alg.adv_policy.load_state_dict(torch.load(args.adv))
+
+            train(alg, args)
+
+            if not args.disable_eval:
+                eval(alg.team_policy, alg.adv_policy, args)
     else:
         raise NotImplemented
 if __name__ == "__main__":

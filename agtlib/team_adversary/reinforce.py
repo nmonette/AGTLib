@@ -76,7 +76,7 @@ class GDmax:
         log_probs = torch.stack(log_probs)
         returns = torch.tensor(returns).flip(-1)
 
-        loss = -torch.dot(log_probs, returns)
+        loss = -torch.dot(log_probs, returns) / len(returns)
 
         if adversary:
             self.adv_optimizer.zero_grad(set_to_none=True)
@@ -97,6 +97,8 @@ class GDmax:
         for i in range(self.rollout_length):
             env = self.env
             obs, _ = env.reset()
+            temp_adv_rewards = []
+            temp_team_rewards = []
             while True:
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
@@ -110,10 +112,12 @@ class GDmax:
                 
                 obs, reward, done, trunc, _ = env.step(action)
 
-                adv_rewards.append(reward[len(reward) - 1])
-                team_rewards.append(reward[0])
+                temp_adv_rewards.append(reward[len(reward) - 1])
+                temp_team_rewards.append(reward[0])
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    adv_rewards.append(sum(temp_adv_rewards))
+                    team_rewards.append(sum(temp_team_rewards))
                     break
         
         return torch.mean(torch.tensor(adv_rewards), dtype=torch.float32), torch.mean(torch.tensor(team_rewards, dtype=torch.float32))
@@ -227,7 +231,7 @@ class NGDmax(GDmax):
 
         # policy = policy.to("mps")
 
-        loss = -torch.dot(log_prob_data, return_data)
+        loss = -torch.dot(log_prob_data, return_data) / len(returns)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -336,7 +340,14 @@ class PGDmax(NGDmax):
     def __init__(self, obs_size, action_size, env, hl_dims=[64,128], lr: float = 0.01, gamma:float = 0.9, rollout_length:int = 50, br_length: int = 100):
         super().__init__(obs_size, action_size, env, hl_dims, lr, gamma, rollout_length, br_length)
         
-        self.ppo_args = dict(policy="MlpPolicy", env=SubprocVecEnv([env for _ in range(10)]), gdmax=True, monitor_wrapper=False)
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+
+        self.ppo_args = dict(policy="MlpPolicy", env=SubprocVecEnv([env for _ in range(10)]), gdmax=True, monitor_wrapper=False, device=device)
 
         self.ppo = PPO(**self.ppo_args)
         self.adv_policy = self.ppo.policy
@@ -394,7 +405,7 @@ class PGDmax(NGDmax):
 
         # policy = policy.to("mps")
 
-        loss = -torch.dot(log_prob_data, return_data)
+        loss = -torch.dot(log_prob_data, return_data) / len(returns)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -413,6 +424,8 @@ class PGDmax(NGDmax):
         for i in range(self.rollout_length):
             env = self.env
             obs, _ = env.reset()
+            temp_team_rewards = []
+            temp_adv_rewards = []
             while True:
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 adv_obs = obs_as_tensor(obs[len(obs) - 1], torch.device("cpu")).reshape(-1, 8) #  torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
@@ -426,10 +439,12 @@ class PGDmax(NGDmax):
                 
                 obs, reward, done, trunc, _ = env.step(action)
 
-                adv_rewards.append(reward[len(reward) - 1])
-                team_rewards.append(reward[0])
+                temp_adv_rewards.append(reward[len(reward) - 1])
+                temp_team_rewards.append(reward[0])
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    adv_rewards.append(sum(temp_adv_rewards))
+                    team_rewards.append(sum(temp_team_rewards))
                     break
         
         return torch.mean(torch.tensor(adv_rewards), dtype=torch.float32), torch.mean(torch.tensor(team_rewards, dtype=torch.float32))
