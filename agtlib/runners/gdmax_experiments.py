@@ -5,9 +5,37 @@ from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper
 
 import torch
 import gymnasium as gym
+from gymnasium.wrappers.record_video import RecordVideo
 import matplotlib.pyplot as plt
 
 def eval(team, adv, args):
+    
+    if False and not args.disable_save:
+        experiment_num = len(list(os.walk('./output')))
+        os.makedirs(f"output/experiment-{experiment_num}")
+        env = RecordVideo(DecentralizedMGWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="rgb_array")), f"output/experiment-{experiment_num}", step_trigger= lambda i: True, name_prefix="demo", disable_logger=True)
+        for episode in range(10):
+            obs, _ = env.reset()
+            env.render()
+            while True:
+                team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+                if args.algorithm == "PREINFORCE":
+                    adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32).reshape(-1, len(obs[len(obs) - 1]))
+                else:
+                    adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32) 
+                team_action = team.get_actions(team_obs)[0]
+                adv_action = adv.get_action(adv_obs)[0]
+                adv_action = adv_action.item()
+                team_translated = team.action_map[team_action]
+                action = {}
+                for i in range(len(team_translated)):
+                    action[i] = team_translated[i]
+                action[len(action)] = adv_action
+                sleep(0.5)
+                obs, reward, trunc, done, _ = env.step(action)
+                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    break
+    
     env = DecentralizedMGWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))
 
     for episode in range(100):
@@ -34,8 +62,9 @@ def eval(team, adv, args):
                 break
 
 def train(alg, args):
-    experiment_num = len(list(os.walk('./output')))
-    os.makedirs(f"output/experiment-{experiment_num}")
+    if not args.disable_save:
+        experiment_num = len(list(os.walk('./output')))
+        os.makedirs(f"output/experiment-{experiment_num}")
     def save(iteration="end"):
         if args.nash_gap:
             plt.xlabel("Iterations")
@@ -51,9 +80,9 @@ def train(alg, args):
             # plt.close()
 
         team = alg.team_policy
-        torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-team-policy.pt")
+        torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-team-policy.pt")
         adv = alg.adv_policy if args.algorithm != "QREINFORCE" else alg
-        torch.save(adv.state_dict() if args.algorithm != "QREINFORCE" else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-3x3-adv-policy.pt")
+        torch.save(adv.state_dict() if args.algorithm != "QREINFORCE" else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-adv-policy.pt")
     
     time_taken_sum = 0
     for i in range(1, args.iters + 1):

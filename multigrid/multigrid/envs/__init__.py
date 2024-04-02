@@ -31,7 +31,7 @@ Configurations
 
 from .blockedunlockpickup import BlockedUnlockPickupEnv
 from .empty import EmptyEnv
-from .team_empty import TeamEmptyEnv, TeamWins, SameStart
+from .team_empty import TeamEmptyEnv, TeamWins, SameStart, TeamCoop
 from .locked_hallway import LockedHallwayEnv
 from .playground import PlaygroundEnv
 from .redbluedoors import RedBlueDoorsEnv
@@ -56,7 +56,8 @@ CONFIGURATIONS = {
     'MultiGrid-Empty-4x4-Team': (TeamEmptyEnv, {'size': 6, "agents": 3, "allow_agent_overlap":True, "max_steps":40}),
     'MultiGrid-Empty-3x3-Team': (TeamEmptyEnv, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":12}),
     "MultiGrid-Empty-3x3-TeamWins":(TeamWins, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":12}),
-    "MultiGrid-Empty-3x3-SameStart":(SameStart, {'size': 7, "agents": 3, "allow_agent_overlap":True, "max_steps":12})
+    "MultiGrid-Empty-3x3-SameStart":(SameStart, {'size': 6, "agents": 3, "allow_agent_overlap":True, "max_steps":12}),
+    "MultiGrid-Empty-3x3-TeamCoop":(SameStart, {'size': 5, "agents": 3, "allow_agent_overlap":True, "max_steps":12})
 }
 
 # Register environments with gymnasium

@@ -230,8 +230,7 @@ class NGDmax(GDmax):
         optimizer = adv_optimizer if adversary else team_optimizer
 
         # policy = policy.to("mps")
-
-        loss = -torch.dot(log_prob_data, return_data) / len(returns)
+        loss = -torch.dot(log_prob_data.flatten(), return_data) / len(returns)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -332,6 +331,73 @@ class QGDmax(NGDmax):
 
         self.nash_gap.append(max(adv_br.item() - adv_base.item(), team_br.item() - team_base.item()))
 
+class TQGDmax(QGDmax):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.team_policy = SoftmaxPolicy(2, 4, [4, 4, 2, 4, 4, 2, 4, 4, 2, 4,4,2, 16], action_map=torch.tensor([(i,j) for i in range(4) for j in range(4)]), lr=self.lr)
+
+    def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
+        if rollout_length is None:
+            rollout_length = self.rollout_length
+
+        if team_policy is None:
+            team_policy = self.team_policy
+        
+        if team_optimizer is None:
+            team_optimizer = self.team_optimizer
+
+        if adv_policy is None:
+            adv_policy = self.adv_policy
+        
+        if adv_optimizer is None and adversary:
+            adv_optimizer = self.adv_optimizer
+
+        log_probs = []
+        rewards = []
+        env = self.env
+
+        obs, _ = env.reset()
+        while True:
+            team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+            team_action, team_log_prob = team_policy.get_actions(team_obs)
+            team_translated = team_policy.action_map[team_action]
+            action = {}
+            for i in range(len(team_translated)):
+                action[i] = team_translated[i]
+            adv_action, adv_log_prob = adv_policy.get_action(adv_obs)
+            action[i+1] = adv_action.item()
+            obs, reward, done, trunc, _ = env.step(action) 
+            if adversary:
+                log_probs.append(adv_log_prob)
+                # obs_data.append(adv_obs)
+                # action_data.append(adv_action)
+                rewards.append(reward[len(reward) - 1])
+            else:
+                log_probs.append(team_log_prob)
+                # obs_data.append(team_obs)
+                # action_data.append(team_action)
+                rewards.append(reward[0])
+
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
+
+        returns = [rewards[-1]]
+        for i in range(2, len(rewards)+1):
+            returns.append(self.gamma * returns[-1] + rewards[-i])
+
+        log_prob_data = torch.stack(log_probs)
+        return_data = torch.tensor(returns, requires_grad=True, dtype=torch.float32).flip(-1)
+
+        policy = adv_policy if adversary else team_policy
+        optimizer = adv_optimizer if adversary else team_optimizer
+
+        # policy = policy.to("mps")
+        loss = torch.dot(log_prob_data.flatten(), return_data) / len(returns)
+
+        self.team_policy.step(loss)
+        
+        return torch.mean(return_data)
 
 class PGDmax(NGDmax):
     """
@@ -347,7 +413,7 @@ class PGDmax(NGDmax):
         else:
             device = torch.device("cpu")
 
-        self.ppo_args = dict(policy="MlpPolicy", env=SubprocVecEnv([env for _ in range(10)]), gdmax=True, monitor_wrapper=False, device=device)
+        self.ppo_args = dict(policy="MlpPolicy", env=SubprocVecEnv([env for _ in range(32)]), gdmax=True, monitor_wrapper=False, device=device)
 
         self.ppo = PPO(**self.ppo_args)
         self.adv_policy = self.ppo.policy
@@ -375,7 +441,7 @@ class PGDmax(NGDmax):
         obs, _ = env.reset()
         while True:
             team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-            adv_obs = obs_as_tensor(obs[len(obs) - 1], torch.device("cpu")).reshape(-1, 8) #  torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+            adv_obs = obs_as_tensor(obs[len(obs) - 1], self.ppo_args["device"]).reshape(-1, 8) #  torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
             team_action, team_log_prob = team_policy.get_actions(team_obs)
             team_translated = team_policy.action_map[team_action]
             action = {}
@@ -399,13 +465,13 @@ class PGDmax(NGDmax):
 
         log_prob_data = torch.stack(log_probs)
         return_data = torch.tensor(returns, requires_grad=True, dtype=torch.float32).flip(-1)
-
+        
         policy = team_policy
         optimizer = team_optimizer
 
         # policy = policy.to("mps")
 
-        loss = -torch.dot(log_prob_data, return_data) / len(returns)
+        loss = -torch.dot(log_prob_data.flatten(), return_data) / len(returns)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -428,7 +494,7 @@ class PGDmax(NGDmax):
             temp_adv_rewards = []
             while True:
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-                adv_obs = obs_as_tensor(obs[len(obs) - 1], torch.device("cpu")).reshape(-1, 8) #  torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+                adv_obs = obs_as_tensor(obs[len(obs) - 1], self.ppo_args["device"]).reshape(-1, 8) #  torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
                 team_action, team_log_prob = team_policy.get_actions(team_obs)
                 team_translated = team_policy.action_map[team_action]
                 action = {}
@@ -451,7 +517,8 @@ class PGDmax(NGDmax):
         
     def get_adv_br(self):
         temp_adv = PPO(**self.ppo_args)
-        temp_adv.learn(50000, opponent_policy=self.team_policy)
+        temp_adv.policy.load_state_dict(self.adv_policy.state_dict())
+        temp_adv.learn(self.br_length * 12, opponent_policy=self.team_policy)
 
         return self.get_utility(adv_policy=temp_adv.policy)[0]
 
@@ -460,13 +527,13 @@ class PGDmax(NGDmax):
         temp_team.load_state_dict(self.team_policy.state_dict())
         temp_optimizer = torch.optim.Adam(temp_team.parameters(), lr=self.lr, maximize=False)
 
-        for i in range(100):
+        for i in range(self.br_length):
             self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
 
         return self.get_utility(team_policy=temp_team)[1]
 
     def step(self):
-        self.ppo.learn(total_timesteps=50000, opponent_policy=self.team_policy)
+        self.ppo.learn(total_timesteps=self.rollout_length * 12, opponent_policy=self.team_policy)
 
         self.update(adversary=False)
 
@@ -474,7 +541,7 @@ class PGDmax(NGDmax):
         """
         GDmax training step with the nash-gap metric.
         """
-        self.ppo.learn(total_timesteps=50000, opponent_policy=self.team_policy)
+        self.ppo.learn(total_timesteps=12 * self.br_length, opponent_policy=self.team_policy)
 
         self.update(adversary=False)
 
@@ -482,5 +549,8 @@ class PGDmax(NGDmax):
 
         adv_br = self.get_adv_br()
         team_br = self.get_team_br()
+
+        print("adversary:",  adv_br.item() - adv_base.item())
+        print("team:",  team_br.item() - team_base.item())
 
         self.nash_gap.append(max(adv_br.item() - adv_base.item(), team_br.item() - team_base.item()))

@@ -62,7 +62,7 @@ class MultiGridWrapper(gym.Wrapper):
         return obs, reward, done, trunc, _
     
     def render(self):
-        self.env.render()
+        return self.env.render()
 
 class DecentralizedMGWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env) -> None:
@@ -95,7 +95,7 @@ class DecentralizedMGWrapper(gym.Wrapper):
         return obs, reward, done, trunc, _
     
     def render(self):
-        self.env.render()
+        return self.env.render()
     
 def action_to_index(action, n_agents):
     """

@@ -8,7 +8,7 @@ def parse_args(cmd_args=sys.argv[1:]):
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-a", "--algorithm", help="Algorithm name", default="NREINFORCE", choices=["NREINFORCE", "QREINFORCE", "PREINFORCE"]
+        "-a", "--algorithm", help="Algorithm name", default="NREINFORCE", choices=["NREINFORCE", "QREINFORCE", "PREINFORCE", "TQREINFORCE"]
     )
     parser.add_argument(
         "-l", "--rollout-length", help="Number of rollout episodes", default=50, type=int, dest="rollout_length"
@@ -41,7 +41,7 @@ def parse_args(cmd_args=sys.argv[1:]):
        "-ng","--nash-gap", help="Measure Nash-Gap", action="store_true", dest="nash_gap"
     )
     parser.add_argument(
-        "-ds", "--disable-save", help="Save model parameters", action="store_true", dest="disable_save"
+        "-ds", "--disable-save", help="Disable checkpoint and eval video saving", action="store_true", dest="disable_save"
     )
     parser.add_argument(
         "-br", "--br-length", help="Number of updates to find best respond", type=int, default=100, dest="br_length"
@@ -56,7 +56,7 @@ def parse_args(cmd_args=sys.argv[1:]):
         "-dim", "--grid-dimension", help="Grid dimension", type=int, default=3, dest="dim"
     )
     parser.add_argument(
-        "-f", "--fix-grid", help="Fix grid configuration", action="store_const", const="MultiGrid-Empty-3x3-SameStart", default= "MultiGrid-Empty-3x3-Team", dest="env"
+        "-f", "--fix-grid", help="Fix grid configuration", action="store_const", const="MultiGrid-Empty-3x3-TeamCoop", default= "MultiGrid-Empty-3x3-Team", dest="env"
     ) # const = "MultiGrid-Empty-3x3-TeamWins"
 
     args, _ = parser.parse_known_args(cmd_args)

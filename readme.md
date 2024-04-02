@@ -23,11 +23,13 @@ pip install -e .
 python -m main
 ```
 # Using the CLI for Adversarial GDmax
-There are many arguments, but here are the highlights:
-- Adversarial Algorithm Selection
-    1. `-a NREINORCE` uses deep REINFORCE
-    2. `-a QREINFORCE` uses SARSA
-    3. `-a PREINFORCE` uses PPO
+- Algorithm Selection
+    - Deep REINFORCE for the team:
+        1. `-a NREINORCE` uses deep REINFORCE for the adversary
+        2. `-a QREINFORCE` uses SARSA for the adversary
+        3. `-a PREINFORCE` uses PPO for the adversary
+    - Softmax REINFORCE for the team:
+        1. `-a TQREINFORCE` uses SARSA for the adversary
 - Hyperparameters
     1. `-i NUM_ITERATIONS`
     2. `-l NUM_EPISODES_PER_ITER`
@@ -41,7 +43,7 @@ There are many arguments, but here are the highlights:
     3. `-adv PATH` supplies path for adversarial policy
     4. `-team PATH` supplies path for team policy 
 - Metrics/Checkpoints:
-    1. `-ds` disables checkpoint saving
+    1. `-ds` disables checkpoint saving and eval video saving
     2. `-si NUM` sets interval for checkpoint saving
     3. `-ng` enables collection of Nash-Gap metric
     4. `-mi NUM` sets interval for collecting metrics

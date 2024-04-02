@@ -355,3 +355,55 @@ class SameStart(TeamEmptyEnv):
                 agent.state.color = "red"
                 agent.state.pos =  (2, 3)
                 agent.state.dir = 1
+
+class TeamCoop(TeamEmptyEnv):
+    action_space = gym.spaces.Dict({
+        0: gym.spaces.Discrete(4),
+        1: gym.spaces.Discrete(4),
+        2: gym.spaces.Discrete(4)
+    })
+
+    observation_space = gym.spaces.MultiDiscrete([3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2])
+    def _gen_grid(self, width, height):
+        """
+        :meta private:
+        """
+        # Generating all coordinates of the grid
+        # coords = [(i,j) for i in range(1,width-1) for j in range(1,height-1)]
+        # shuffle(coords)
+        # Create an empty grid
+        self.grid = Grid(width, height)
+
+        # Generate the surrounding walls
+        self.grid.wall_rect(0, 0, width, height)
+        
+        # Place a goal square in the bottom-right corner
+        # self.goal1 = coords.pop()
+        # self.goal2 = coords.pop()
+
+        self.goal1 = np.array((1,1))
+        self.goal2 = np.array((width-2, 1))
+        self.put_obj(Goal(), *self.goal1)
+        self.put_obj(Goal(), *self.goal2)
+
+        self.goal1_terminated = False
+        self.goal2_terminated = False
+
+        self.agent_start_pos = np.array((1,1))
+        self.agent_start_dir = np.array((1,1))
+
+        self.allow_agent_overlap = True
+
+        # Place the agent
+        for agent in self.agents:
+            # Setting team colors
+            if agent.index == 0:
+                agent.state.color = "blue"
+                agent.state.pos = (2, 2)
+            elif agent.index == 1:
+                agent.state.color = "blue"
+                agent.state.pos = (2, 2)
+            else:       
+                agent.state.color = "red"
+                agent.state.pos =  (2, 3)
+                agent.state.dir = 1

@@ -114,6 +114,8 @@ class SELUPolicy(nn.Module):
             Defaults to `[64,128]`. Note that this does not include the input or output layers.
         """
         super(SELUPolicy, self).__init__()
+        dim = 4
+        obs_size = sum(np.array([dim,dim,dim,dim,2,dim,dim,2]))
         prev_dim = obs_size 
         hl_dims.append(action_size)
         self.layers = nn.ModuleList()
@@ -147,8 +149,8 @@ class SELUPolicy(nn.Module):
             dim=-1,
         ).view(obs.shape[0], sum(obs_space))
         for i in range(len(self.layers) - 1):
-            x = self.selu(self.layers[i](x))
-        return self.layers[-1](x)
+            obs = self.selu(self.layers[i](obs))
+        return self.layers[-1](obs)
 
     def get_action(self, x: torch.Tensor) -> int:
         """
@@ -386,27 +388,30 @@ class SoftmaxPolicy(nn.Module):
         empty = torch.empty(*param_dims)
         nn.init.orthogonal_(empty)
         self.params = nn.Parameter(nn.Softmax()(empty), requires_grad=True)
+
+        self.optimizer = torch.optim.Adam([self.params])
         
 
     def forward(self, x):
         # [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16]
-        return self.params[*x, :]
+        return self.params[*x.int(), :]
 
     def get_actions(self, x):
         dist = torch.distributions.Categorical(self.__call__(x)) # make categorical distribution and then decode the action index
         action = dist.sample()
         log_prob = dist.log_prob(action)
-        if self.action_map is not None:
-            return self.action_map[action], log_prob
-        else:
-            return action, log_prob
+        return action, log_prob
     
     def step(self, loss):
-        loss.backward(inputs=(self.params,)) # inputs=(self.params,)
+        # loss.backward(inputs=(self.params,)) # inputs=(self.params,)
 
-        x = self.params + self.lr * self.params.grad
-        self.params.grad.zero_()
-        self.params.data = nn.Softmax()(x)
+        # x = self.params - self.lr * self.params.grad
+        # self.params.grad.zero_()
+        # self.params.data = nn.Softmax()(x)
+
+        self.optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        self.optimizer.step()
 
 class MAPolicyNetwork(nn.Module):
     def __init__(self, obs_size: int, action_size: int, action_map: List[List[int, ]], hl_dims: Iterable[int, ] = [64, 128]) -> None:
@@ -501,6 +506,8 @@ class SELUMAPolicy(nn.Module):
             Defaults to `[64,128]`. Note that this does not include the input or output layers.
         """
         super(SELUMAPolicy, self).__init__()
+        dim = 4
+        obs_size = sum(np.array([dim,dim,2, dim,dim,2,dim,dim,2,dim,dim,2]))
         prev_dim = obs_size 
         hl_dims.append(action_size)
         self.layers = nn.ModuleList()
@@ -538,8 +545,8 @@ class SELUMAPolicy(nn.Module):
             dim=-1,
         ).view(obs.shape[0], sum(obs_space))
         for i in range(len(self.layers) - 1):
-            x = self.selu(self.layers[i](x))
-        return self.layers[-1](x)
+            obs = self.selu(self.layers[i](obs))
+        return self.layers[-1](obs)
 
     def get_actions(self, x: torch.Tensor) -> int:
         """
