@@ -81,8 +81,8 @@ def train(alg, args):
 
         team = alg.team_policy
         torch.save(team.state_dict(), f"output/experiment-{experiment_num}/" + str(iteration) + "-team-policy.pt")
-        adv = alg.adv_policy if args.algorithm != "QREINFORCE" else alg
-        torch.save(adv.state_dict() if args.algorithm != "QREINFORCE" else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-adv-policy.pt")
+        adv = alg.adv_policy if args.algorithm not in ["QREINFORCE", "TQREINFORCE"] else alg
+        torch.save(adv.state_dict() if args.algorithm not in ["QREINFORCE", "TQREINFORCE"] else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-adv-policy.pt")
     
     time_taken_sum = 0
     for i in range(1, args.iters + 1):
