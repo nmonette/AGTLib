@@ -97,6 +97,42 @@ class DecentralizedMGWrapper(gym.Wrapper):
     def render(self):
         return self.env.render()
     
+class IndepdendentTeamWrapper(gym.Wrapper):
+    def __init__(self, env: gym.Env) -> None:
+        """
+        Parameters
+        ----------
+        env: gym.Env
+            Simulation environment.
+        """
+        self.env = env
+        dim = env.unwrapped.grid_size -2 
+
+        # Set for adversary in stable_baselines GDmax
+        self.observation_space = gym.spaces.Dict({0:gym.spaces.MultiDiscrete([dim, dim, 2, dim, dim, 2, dim, dim, 2]), 1: gym.spaces.MultiDiscrete([dim, dim, dim, dim, 2, dim, dim, 2]), 2:gym.spaces.MultiDiscrete([dim, dim, 2, dim, dim, 2, dim, dim, 2])})
+        self.action_space = gym.spaces.Discrete(4)
+    
+    def reset(self, *args, **kwargs):
+        obs, _ = self.env.reset()
+        obs = obs[0]
+        new_obs =  {i: np.concatenate((obs[i * 3: i*3 + 3], obs[len(obs) - 6: len(obs)])) for i in range(len(self.observation_space) - 1)}
+        new_obs[len(self.observation_space) - 1] =  obs[[i for i in range(len(obs) - 9, len(obs)) if i != len(obs) - 7]]
+        return new_obs, _
+    
+    def step(self, action: dict):
+        obs, reward, done, trunc, _ = self.env.step(action)
+        obs = obs[0]
+        new_obs =  {i: np.concatenate((obs[i * 3: i*3 + 3], obs[len(obs) - 6: len(obs)])) for i in range(len(self.observation_space) - 1)}
+        new_obs[len(self.observation_space) - 1] =  obs[[i for i in range(len(obs) - 9, len(obs)) if i != len(obs) - 7]]
+    
+        if isinstance(trunc, bool):
+            trunc = {i: trunc for i in range(len(obs))}
+        
+        return new_obs, reward, done, trunc, _
+    
+    def render(self):
+        return self.env.render()
+    
 def action_to_index(action, n_agents):
     """
     Action is a numpy vector (a1, a2,..., a_n)

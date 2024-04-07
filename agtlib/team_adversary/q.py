@@ -86,12 +86,12 @@ class TabularQ:
             done = False
             rewards = []
             while True:
-                team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+                team_obs = [torch.tensor(obs[0], device="cpu", dtype=torch.float32), torch.tensor(obs[1], device="cpu", dtype=torch.float32)]
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.int)
-                team_action, _ = opponent_policy.get_actions(team_obs)
+                team_translated, _ = opponent_policy.get_actions(team_obs)
                 adv_action, _ = self.get_action(adv_obs)
                 adv_action = adv_action.item()
-                team_translated = opponent_policy.action_map[team_action]
+                # team_translated = opponent_policy.action_map[team_action]
                 action = {}
                 for i in range(len(team_translated)):
                     action[i] = team_translated[i]

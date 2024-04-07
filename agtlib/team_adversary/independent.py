@@ -8,7 +8,7 @@ from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 
 
 from .q import TabularQ
-from agtlib.common.base import PolicyNetwork, SELUPolicy, SoftmaxPolicy, MAPolicyNetwork, SELUMAPolicy
+from agtlib.common.base import PolicyNetwork, SELUPolicy, SoftmaxPolicy, MAPolicyNetwork, SELUMAPolicy, IndependentSoftmaxPolicy as ISPolicy, IndependentDirectPolicy as IDPolicy
 # from agtlib.utils.stable_baselines.vec_env.subproc_vec_env import SubprocVecEnv
 
 from agtlib.utils.rollout import GDmaxRollout
@@ -35,6 +35,7 @@ class GDmax:
         self.adv_policy = SELUPolicy(obs_size - 4, action_size, hl_dims.copy())
         # self.adv_policy.load_state_dict(torch.load("/Users/phillip/projects/AGTLib/output/experiment-40/end-3x3-adv-policy-n-reinforce.pt"))
         self.adv_optimizer = torch.optim.Adam(self.adv_policy.parameters(), lr=lr, maximize=False)
+        
         self.param_dims = param_dims
         if param_dims is not None:
             self.team_policy = SoftmaxPolicy(2, 4, param_dims, lr, [(i,j) for i in range(self.action_size) for j in range(self.action_size)]) 
@@ -306,7 +307,6 @@ class QGDmax(NGDmax):
             self.update(adversary=False, team_policy=temp_team, team_optimizer=temp_optimizer)
 
         return self.get_utility(team_policy=temp_team)[1]
-        
     
     def step(self):
         """
@@ -334,7 +334,17 @@ class QGDmax(NGDmax):
 class TQGDmax(QGDmax):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.team_policy = SoftmaxPolicy(2, 4, [4, 4, 2, 4, 4, 2, 4, 4, 2, 4,4,2, 16], action_map=torch.tensor([(i,j) for i in range(4) for j in range(4)]), lr=self.lr)
+        self.dim = 4
+        self.team_policy = IDPolicy(2, 4, [self.dim,self.dim,2, self.dim, self.dim, 2, self.dim, self.dim, 2, 4], lr=self.lr)
+
+    def get_team_br(self):
+        temp_team = IDPolicy(2, 4, [self.dim,self.dim,2, self.dim, self.dim, 2, self.dim, self.dim, 2, 4], lr=self.lr)
+        temp_team.load_state_dict(self.team_policy.state_dict())
+
+        for i in range(100):
+            self.update(adversary=False, team_policy=temp_team)
+
+        return self.get_utility(team_policy=temp_team)[1]
 
     def update(self, adversary=True, team_policy=None, team_optimizer=None, adv_policy=None, adv_optimizer=None, rollout_length=None):
         if rollout_length is None:
@@ -358,13 +368,13 @@ class TQGDmax(QGDmax):
 
         obs, _ = env.reset()
         while True:
-            team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+            team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+            team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, team_log_prob = team_policy.get_actions(team_obs)
-            team_translated = team_policy.action_map[team_action]
+            team_action, team_log_prob = team_policy.get_actions([team_obs1, team_obs2])
             action = {}
-            for i in range(len(team_translated)):
-                action[i] = team_translated[i]
+            for i in range(len(team_action)):
+                action[i] = team_action[i]
             adv_action, adv_log_prob = adv_policy.get_action(adv_obs)
             action[i+1] = adv_action.item()
             obs, reward, done, trunc, _ = env.step(action) 
@@ -387,17 +397,54 @@ class TQGDmax(QGDmax):
             returns.append(self.gamma * returns[-1] + rewards[-i])
 
         log_prob_data = torch.stack(log_probs)
-        return_data = torch.tensor(returns, requires_grad=True, dtype=torch.float32).flip(-1)
+        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32).flip(-1)
 
         policy = adv_policy if adversary else team_policy
         optimizer = adv_optimizer if adversary else team_optimizer
 
         # policy = policy.to("mps")
-        loss = -torch.dot(log_prob_data.flatten(), return_data) / len(returns)
+        loss1 = -torch.dot(log_prob_data[:, 0].flatten(), return_data) / len(returns)
+        loss2 = -torch.dot(log_prob_data[:, 1].flatten(), return_data.clone()) / len(returns)
 
-        self.team_policy.step(loss)
+        team_policy.step([loss1, loss2])
         
         return torch.mean(return_data)
+    
+    def get_utility(self, team_policy=None, adv_policy=None):
+        team_rewards = []
+        adv_rewards = []
+        if team_policy is None:
+            team_policy = self.team_policy
+        if adv_policy is None:
+            adv_policy = self.adv_policy
+
+        for i in range(self.rollout_length):
+            env = self.env
+            obs, _ = env.reset()
+            temp_adv_rewards = []
+            temp_team_rewards = []
+            while True:
+                team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+                team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+                team_action, team_log_prob = team_policy.get_actions([team_obs1, team_obs2])
+                action = {}
+                for i in range(len(team_action)):
+                    action[i] = team_action[i]
+                adv_action, adv_log_prob = adv_policy.get_action(adv_obs)
+                action[i+1] = adv_action.item()
+                
+                obs, reward, done, trunc, _ = env.step(action)
+
+                temp_adv_rewards.append(reward[len(reward) - 1])
+                temp_team_rewards.append(reward[0])
+
+                if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                    adv_rewards.append(sum(temp_adv_rewards))
+                    team_rewards.append(sum(temp_team_rewards))
+                    break
+        
+        return torch.mean(torch.tensor(adv_rewards), dtype=torch.float32), torch.mean(torch.tensor(team_rewards, dtype=torch.float32))
 
 class PGDmax(NGDmax):
     """

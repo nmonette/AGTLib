@@ -1,7 +1,7 @@
 from time import sleep, time
 import os
 
-from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper
+from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper, IndepdendentTeamWrapper
 
 import torch
 import gymnasium as gym
@@ -35,22 +35,31 @@ def eval(team, adv, args):
                 obs, reward, trunc, done, _ = env.step(action)
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
                     break
-    
-    env = DecentralizedMGWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))
+    if args.algorithm != "TQREINFORCE":
+        env = DecentralizedMGWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))
+    else:
+        env = IndepdendentTeamWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))
 
     for episode in range(100):
         obs, _ = env.reset()
         env.render()
         while True:
-            team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+            
             if args.algorithm == "PREINFORCE":
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32).reshape(-1, len(obs[len(obs) - 1]))
             else:
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32) 
-            team_action = team.get_actions(team_obs)[0]
+            if args.algorithm == "TQREINFORCE":
+                team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+                team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
+                team_translated = team.get_actions([team_obs1, team_obs2])[0]
+            else:
+                team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+                team_action = team.get_actions(team_obs)[0]
+                team_translated = team.action_map[team_action]
             adv_action = adv.get_action(adv_obs)[0]
             adv_action = adv_action.item()
-            team_translated = team.action_map[team_action]
+            
             action = {}
             for i in range(len(team_translated)):
                 action[i] = team_translated[i]

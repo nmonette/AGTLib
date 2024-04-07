@@ -2,10 +2,11 @@ import sys
 
 from agtlib.runners.parse_args import parse_args
 from agtlib.runners.gdmax_experiments import eval, train
-from agtlib.team_adversary.reinforce import GDmax, NGDmax as NREINFORCE, QGDmax as QREINFORCE, PGDmax as PREINFORCE, TQGDmax as TQREINFORCE
+from agtlib.team_adversary.reinforce import GDmax, NGDmax as NREINFORCE, QGDmax as QREINFORCE, PGDmax as PREINFORCE #, TQGDmax as TQREINFORCE
+from agtlib.team_adversary.independent import TQGDmax as TQREINFORCE
 from agtlib.common.base import SELUPolicy, SELUMAPolicy, SoftmaxPolicy
 from agtlib.team_adversary.q import TabularQ
-from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper
+from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper, IndepdendentTeamWrapper
 from agtlib.cooperative.ppo import train_ppo
 
 from stable_baselines3 import PPO
@@ -104,7 +105,7 @@ def main(cmd_args=sys.argv[1:]):
             else:
                 qtable = torch.zeros((dim, dim, dim, dim, 2, dim ,dim, 2, 4))
 
-            alg = TQREINFORCE(qtable, 12, 4, lambda: DecentralizedMGWrapper(gym.make(args.env,  agents=3, size = dim + 2, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, hl_dims=args.net_arch, br_length=args.br_length)
+            alg = TQREINFORCE(qtable, 12, 4, lambda: IndepdendentTeamWrapper(gym.make(args.env,  agents=3, size = dim + 2, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, hl_dims=args.net_arch, br_length=args.br_length)
 
             if args.team is not None:
                 alg.team_policy.load_state_dict(torch.load(args.team))

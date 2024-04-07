@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 
+from agtlib.utils.projection import project_simplex
+
 
 class PolicyNetwork(nn.Module):
     """
@@ -391,27 +393,103 @@ class SoftmaxPolicy(nn.Module):
 
         self.optimizer = torch.optim.Adam([self.params])
         
-
     def forward(self, x):
         # [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16]
         return self.params[*x.int(), :]
 
     def get_actions(self, x):
-        dist = torch.distributions.Categorical(self.__call__(x)) # make categorical distribution and then decode the action index
+        dist = torch.distributions.Categorical(logits=self.__call__(x)) # make categorical distribution and then decode the action index
         action = dist.sample()
         log_prob = dist.log_prob(action)
         return action, log_prob
     
     def step(self, loss):
-        # loss.backward(inputs=(self.params,)) # inputs=(self.params,)
+        loss.backward(inputs=(self.params,)) # inputs=(self.params,)
 
-        # x = self.params - self.lr * self.params.grad
-        # self.params.grad.zero_()
-        # self.params.data = nn.Softmax()(x)
+        self.params.data = self.params - self.lr * self.params.grad
+        self.params.grad.zero_()
 
-        self.optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        self.optimizer.step()
+        # self.optimizer.zero_grad(set_to_none=True)
+        # loss.backward(inputs=(self.params,))
+        # self.optimizer.step()
+
+class DirectPolicy(nn.Module):
+    def __init__(self, n_actions, param_dims, lr=0.01):
+        super(DirectPolicy, self).__init__()
+        self.lr = lr
+
+        self.n_actions = n_actions
+        self.param_dims = param_dims
+
+        empty = torch.empty(*param_dims)
+        nn.init.orthogonal_(empty)
+        self.params = nn.Parameter(project_simplex(empty), requires_grad=True)
+        
+        self.t = torch.ones((1, ))
+
+        # self.optimizer = torch.optim.Adam([self.params])
+
+    def forward(self, x):
+        return self.params[*x.int(), :]
+    
+    def get_actions(self, x):
+        dist = torch.distributions.Categorical(logits=self.__call__(x)) # make categorical distribution and then decode the action index
+        action = dist.sample()
+        log_prob = dist.log_prob(action)
+        return action, log_prob
+    
+    def step(self, loss):
+        loss.backward(inputs=(self.params,)) # inputs=(self.params,)
+
+        self.params.data = project_simplex(self.params - (30 * self.lr / torch.sqrt(self.t)) * self.params.grad)
+        self.params.grad.zero_()
+
+        self.t += 1
+
+class IndependentDirectPolicy(nn.Module):
+    def __init__(self, n_agents, n_actions, param_dims, lr= 0.01):
+        super(IndependentDirectPolicy, self).__init__()
+        self.policies = nn.ModuleList([DirectPolicy(4, param_dims, lr) for _ in range(n_agents)])
+    
+    def get_actions(self, x):
+
+        log_probs = []
+        actions = []
+
+        for i in range(len(self.policies)):
+            action, log_prob = self.policies[i].get_actions(x[i])
+            log_probs.append(log_prob)
+            actions.append(action)
+
+        return torch.stack(actions), torch.stack(log_probs)
+    
+    def step(self, loss):
+        for i in range(len(loss)):
+            self.policies[i].step(loss[i])
+
+
+class IndependentSoftmaxPolicy(nn.Module):
+    def __init__(self, n_agents, n_actions, param_dims, lr= 0.01):
+        super(IndependentDirectPolicy, self).__init__()
+        self.policies = nn.ModuleList([SoftmaxPolicy(1, n_agents, param_dims, lr) for _ in range(n_agents)])
+    
+    def get_actions(self, x):
+
+        log_probs = []
+        actions = []
+
+        for i in range(len(self.policies)):
+            temp_obs = torch.tensor(x[i], dtype=torch.float32)
+            action, log_prob = self.policies[i].get_actions(temp_obs)
+            log_probs.append(log_prob)
+            actions.append(action)
+
+        return torch.stack(actions), torch.stack(log_probs)
+    
+    def step(self, loss):
+        for i in range(len(loss)):
+            self.policies[i].step(loss[i])
+            
 
 class MAPolicyNetwork(nn.Module):
     def __init__(self, obs_size: int, action_size: int, action_map: List[List[int, ]], hl_dims: Iterable[int, ] = [64, 128]) -> None:
@@ -581,7 +659,7 @@ class SELUMAPolicy(nn.Module):
             The actions to evaluate. 
         """
         dist = torch.distributions.Categorical(logits=(self.__call__(obs)))
-        return dist.log_prob(actions)
+        return dist.log_prob(actions)    
 
 
 class RLBase(ABC):
