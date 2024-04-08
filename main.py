@@ -91,7 +91,7 @@ def main(cmd_args=sys.argv[1:]):
     elif args.algorithm == "TQREINFORCE":
         dim = args.dim
         if args.eval:
-            team = IDPolicy(2, 4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, 4], args.lr, torch.tensor([(i,j) for i in range(4) for j in range(4)]))
+            team = IDPolicy(2, 4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, 4], args.lr)
             team.load_state_dict(torch.load(args.team))
 
             qtable = torch.load(args.adv)
