@@ -4,7 +4,7 @@ from agtlib.runners.parse_args import parse_args
 from agtlib.runners.gdmax_experiments import eval, train
 from agtlib.team_adversary.reinforce import GDmax, NGDmax as NREINFORCE, QGDmax as QREINFORCE, PGDmax as PREINFORCE #, TQGDmax as TQREINFORCE
 from agtlib.team_adversary.independent import TQGDmax as TQREINFORCE
-from agtlib.common.base import SELUPolicy, SELUMAPolicy, SoftmaxPolicy
+from agtlib.common.base import SELUPolicy, SELUMAPolicy, SoftmaxPolicy, IndependentDirectPolicy as IDPolicy
 from agtlib.team_adversary.q import TabularQ
 from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper, IndepdendentTeamWrapper
 from agtlib.cooperative.ppo import train_ppo
@@ -91,7 +91,7 @@ def main(cmd_args=sys.argv[1:]):
     elif args.algorithm == "TQREINFORCE":
         dim = args.dim
         if args.eval:
-            team = SoftmaxPolicy(2, 4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, dim, dim, 2, 16], args.lr, torch.tensor([(i,j) for i in range(4) for j in range(4)]))
+            team = IDPolicy(2, 4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, 4], args.lr, torch.tensor([(i,j) for i in range(4) for j in range(4)]))
             team.load_state_dict(torch.load(args.team))
 
             qtable = torch.load(args.adv)
