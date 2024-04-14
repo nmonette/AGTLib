@@ -38,7 +38,7 @@ def eval(team, adv, args):
     if args.algorithm != "TQREINFORCE":
         env = DecentralizedMGWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))
     else:
-        env = IndepdendentTeamWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))
+        env = MultiGridWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))# IndepdendentTeamWrapper(gym.make(args.env, agents=3, size = args.dim + 2, disable_env_checker=True, render_mode="human"))
 
     for episode in range(100):
         obs, _ = env.reset()

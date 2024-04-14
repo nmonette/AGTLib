@@ -91,7 +91,7 @@ def main(cmd_args=sys.argv[1:]):
     elif args.algorithm == "TQREINFORCE":
         dim = args.dim
         if args.eval:
-            team = IDPolicy(2, 4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, 4], args.lr)
+            team = IDPolicy(2, 4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, dim, dim, 2, dim, dim, 2, 4], args.lr) # IDPolicy(2, 4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, 4], args.lr)
             team.load_state_dict(torch.load(args.team))
 
             qtable = torch.load(args.adv)
@@ -103,9 +103,9 @@ def main(cmd_args=sys.argv[1:]):
             if args.adv is not None:
                 qtable = torch.load(args.adv)
             else:
-                qtable = torch.zeros((dim, dim, dim, dim, 2, dim ,dim, 2, 4))
+                qtable = torch.zeros([dim, dim, 2, dim, dim, 2, dim, dim, 2, dim, dim, 2, dim, dim, 2, 4])# torch.zeros((dim, dim, dim, dim, 2, dim ,dim, 2, 4))
 
-            alg = TQREINFORCE(qtable, 12, 4, lambda: IndepdendentTeamWrapper(gym.make(args.env,  agents=3, size = dim + 2, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, hl_dims=args.net_arch, br_length=args.br_length)
+            alg = TQREINFORCE(qtable, 12, 4, lambda: MultiGridWrapper(gym.make(args.env,  agents=3, size = dim + 2, disable_env_checker=True)), rollout_length=args.rollout_length, lr=args.lr, gamma=args.gamma, hl_dims=args.net_arch, br_length=args.br_length)
 
             if args.team is not None:
                 alg.team_policy.load_state_dict(torch.load(args.team))

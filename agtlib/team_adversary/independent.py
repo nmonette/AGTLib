@@ -335,14 +335,17 @@ class TQGDmax(QGDmax):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dim = 4
-        self.team_policy = IDPolicy(2, 4, [self.dim,self.dim,2, self.dim, self.dim, 2, self.dim, self.dim, 2, 4], lr=self.lr)
 
-    def get_team_br(self):
-        temp_team = IDPolicy(2, 4, [self.dim,self.dim,2, self.dim, self.dim, 2, self.dim, self.dim, 2, 4], lr=self.lr)
+        self.team_args = (2, 4, [self.dim,self.dim,2, self.dim,self.dim,2, self.dim,self.dim,2, self.dim, self.dim, 2, self.dim, self.dim, 2, 4], self.lr)
+
+        self.team_policy = IDPolicy(*self.team_args) # IDPolicy(2, 4, [self.dim,self.dim,2, self.dim, self.dim, 2, self.dim, self.dim, 2, 4], lr=self.lr)
+
+    def get_team_br(self, policy_idx):
+        temp_team = IDPolicy(*self.team_args) # IDPolicy(2, 4, [self.dim,self.dim,2, self.dim, self.dim, 2, self.dim, self.dim, 2, 4], lr=self.lr)
         temp_team.load_state_dict(self.team_policy.state_dict())
 
-        for i in range(100):
-            self.update(adversary=False, team_policy=temp_team)
+        for i in range(self.br_length):
+            self.single_update(temp_team.policies[policy_idx], policy_idx)
 
         return self.get_utility(team_policy=temp_team)[1]
 
@@ -410,6 +413,43 @@ class TQGDmax(QGDmax):
         
         return torch.mean(return_data)
     
+    def single_update(self, policy, policy_idx):
+        log_probs = []
+        rewards = []
+        env = self.env
+
+        obs, _ = env.reset()
+        while True:
+            team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
+            team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+            team_action, team_log_prob = self.team_policy.get_actions([team_obs1, team_obs2])
+            action = {}
+            for i in range(len(team_action)):
+                action[i] = team_action[i]
+            adv_action, adv_log_prob = self.adv_policy.get_action(adv_obs)
+            action[i+1] = adv_action.item()
+            action[policy_idx], policy_log_prob = policy.get_actions(torch.tensor(obs[policy_idx], device="cpu", dtype=torch.float32))
+            obs, reward, done, trunc, _ = env.step(action) 
+            
+            log_probs.append(policy_log_prob)
+            rewards.append(reward[policy_idx])
+
+            if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
+                break
+
+        returns = [rewards[-1]]
+        for i in range(2, len(rewards)+1):
+            returns.append(self.gamma * returns[-1] + rewards[-i])
+
+        log_prob_data = torch.stack(log_probs)
+        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32).flip(-1)
+
+        # policy = policy.to("mps")
+        loss = -torch.dot(log_prob_data, return_data) / len(returns)
+
+        policy.step(loss)
+            
     def get_utility(self, team_policy=None, adv_policy=None):
         team_rewards = []
         adv_rewards = []
@@ -445,6 +485,23 @@ class TQGDmax(QGDmax):
                     break
         
         return torch.mean(torch.tensor(adv_rewards), dtype=torch.float32), torch.mean(torch.tensor(team_rewards, dtype=torch.float32))
+
+    def step_with_gap(self):
+        self.qpolicy.train(self.team_policy)
+
+        self.update(adversary=False)
+
+        adv_base, team_base = self.get_utility()
+
+        adv_br = self.get_adv_br()
+        team_br = torch.zeros((len(self.team_policy.policies)))
+        
+        for i in range(len(team_br)):
+            team_br[i] = self.get_team_br(i)
+
+        team_diff = torch.max(team_br - team_base)
+
+        self.nash_gap.append(max(adv_br.item() - adv_base.item(), team_diff.item()))
 
 class PGDmax(NGDmax):
     """
