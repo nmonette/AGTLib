@@ -19,7 +19,7 @@ class TruncDirectPolicy(nn.Module):
     def forward(self, x):
         return self.params[*x.int(), :]
     
-    def get_actions(self, x):
+    def get_action(self, x):
         dist = torch.distributions.Categorical(logits=self.__call__(x)) # make categorical distribution and then decode the action index
         action = dist.sample()
         log_prob = dist.log_prob(action)
@@ -28,7 +28,7 @@ class TruncDirectPolicy(nn.Module):
     def step(self, loss):
         loss.backward(inputs=(self.params,)) # inputs=(self.params,)
 
-        self.params.data = projection_simplex_truncated(self.params + self.lr * self.params.grad)
+        self.params.data = projection_simplex_truncated(self.params - self.lr * self.params.grad, self.eps)
         self.params.grad.zero_()
 
 class IPGDmax:
@@ -44,13 +44,15 @@ class IPGDmax:
         self.num_agents = num_agents
         self.num_rollouts = num_rollouts
 
-        self.team_args = (num_agents, num_actions, param_dims, team_lr)
+        self.team_args = (num_agents - 1, num_actions, param_dims, team_lr)
         self.adv_args = (num_actions, param_dims, adv_lr, eps)
 
         self.team_policy = IndependentDirectPolicy(*self.team_args)
         self.adv_policy = TruncDirectPolicy(*self.adv_args)
 
         self.env = env
+
+        self.nash_gap = []
 
     def update_adv(self, policy):
         log_probs = []
@@ -62,7 +64,7 @@ class IPGDmax:
 
         for episode in range(self.num_rollouts):
             episode_log_probs = []
-            episode_lambda = torch.zeros_like(self.param_dims)
+            episode_lambda = torch.zeros(self.param_dims)
             episode_rewards = []
             episode_actions = []
             episode_states = []
@@ -74,7 +76,7 @@ class IPGDmax:
                 team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-                team_action, _ = self.team_policy.get_actions([team_obs1, team_obs2])
+                team_action, _ = self.team_policy.get_action([team_obs1, team_obs2])
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
@@ -86,8 +88,8 @@ class IPGDmax:
                 episode_rewards.append(reward[len(obs) - 1])
                 episode_actions.append(adv_action)
                 episode_states.append(adv_obs.int())
-                step_lambda = torch.zeros_like(episode_lambda)
-                step_lambda[*obs[len(obs) - 1].int(), adv_action] = gamma
+                step_lambda = torch.zeros_like(episode_lambda, device="mps")
+                step_lambda[*obs[len(obs) - 1].astype(int), adv_action] = gamma
                 gamma *= self.gamma
 
                 if list(trunc.values()).count(True) >= 2 or list(done.values()).count(True) >= 2:
@@ -97,7 +99,7 @@ class IPGDmax:
 
             log_probs.append(episode_log_probs)
             lambda_ += episode_lambda
-            rewards.append(torch.tensor(episode_rewards))
+            rewards.append(torch.tensor(episode_rewards, device="cpu"))
             actions.append(episode_actions)
             states.append(episode_states)
             dones.append(t)
@@ -105,13 +107,11 @@ class IPGDmax:
         
         lambda_ /= self.num_rollouts
 
-        # calculate discounted and regularized returns
-        # reward_table = nn.utils.rnn.pad_sequence(rewards) - self.nu * lambda_
         returns = []
         for i in range(len(dones)):
-            start_return = (rewards[i][-1] - self.nu * lambda_[*states[i][-1], action[i][-1]]) * sum(log_probs[i])
+            start_return = (rewards[i][-1] - self.nu * lambda_[*states[i][-1], actions[i][-1]]) * sum(log_probs[i])
             for j in range(2, dones[i]+1):
-                start_return += (rewards[i][-j] - self.nu * lambda_[*states[i][-j], action[i][-j]]) * sum(log_probs[i][:-j])
+                start_return += (rewards[i][-j] - self.nu * lambda_[*states[i][-j], actions[i][-j]]) * sum(log_probs[i][:-j])
                 
             returns.append(start_return)
 
@@ -128,7 +128,7 @@ class IPGDmax:
             team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, team_log_prob = self.team_policy.get_actions([team_obs1, team_obs2])
+            team_action, team_log_prob = self.team_policy.get_action([team_obs1, team_obs2])
             action = {}
             for i in range(len(team_action)):
                 action[i] = team_action[i]
@@ -146,7 +146,7 @@ class IPGDmax:
             returns.append(self.gamma * returns[-1] + rewards[-i])
 
         log_prob_data = torch.stack(log_probs)
-        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32).flip(-1)
+        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32, device="cpu").flip(-1)
 
         loss1 = -torch.dot(log_prob_data[:, 0].flatten(), return_data) / len(returns)
         loss2 = -torch.dot(log_prob_data[:, 1].flatten(), return_data.clone()) / len(returns)
@@ -163,13 +163,13 @@ class IPGDmax:
             team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, team_log_prob = self.team_policy.get_actions([team_obs1, team_obs2])
+            team_action, team_log_prob = self.team_policy.get_action([team_obs1, team_obs2])
             action = {}
             for i in range(len(team_action)):
                 action[i] = team_action[i]
             adv_action, adv_log_prob = self.adv_policy.get_action(adv_obs)
             action[i+1] = adv_action.item()
-            action[policy_idx], policy_log_prob = policy.get_actions(torch.tensor(obs[policy_idx], device="cpu", dtype=torch.float32))
+            action[policy_idx], policy_log_prob = policy.get_action(torch.tensor(obs[policy_idx], device="cpu", dtype=torch.float32))
             obs, reward, done, trunc, _ = env.step(action) 
             
             log_probs.append(policy_log_prob)
@@ -183,7 +183,7 @@ class IPGDmax:
             returns.append(self.gamma * returns[-1] + rewards[-i])
 
         log_prob_data = torch.stack(log_probs)
-        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32).flip(-1)
+        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32, device="cpu").flip(-1)
 
         loss = -torch.dot(log_prob_data, return_data) / len(returns)
 
@@ -198,7 +198,7 @@ class IPGDmax:
         if adv_policy is None:
             adv_policy = self.adv_policy
 
-        for i in range(self.rollout_length):
+        for i in range(self.num_rollouts):
             env = self.env
             obs, _ = env.reset()
             temp_adv_rewards = []
@@ -207,7 +207,7 @@ class IPGDmax:
                 team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-                team_action, team_log_prob = team_policy.get_actions([team_obs1, team_obs2])
+                team_action, team_log_prob = team_policy.get_action([team_obs1, team_obs2])
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
@@ -228,7 +228,8 @@ class IPGDmax:
     
     def get_adv_br(self):
         temp_adv = TruncDirectPolicy(*self.adv_args)
-        temp_adv.load_state_dict(self.team_policy.state_dict())
+        temp_adv.load_state_dict(self.adv_policy.state_dict())
+
         for _ in range(self.br):
             self.update_adv(temp_adv)
 
@@ -239,7 +240,7 @@ class IPGDmax:
         temp_team = IndependentDirectPolicy(*self.team_args)
         temp_team.load_state_dict(self.team_policy.state_dict())
 
-        for i in range(self.br_length):
+        for _ in range(self.br):
             self.single_update(temp_team.policies[policy_idx], policy_idx)
 
         return self.get_utility(team_policy=temp_team)[1]

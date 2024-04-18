@@ -8,7 +8,7 @@ def parse_args(cmd_args=sys.argv[1:]):
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-a", "--algorithm", help="Algorithm name", default="NREINFORCE", choices=["NREINFORCE", "QREINFORCE", "PREINFORCE", "TQREINFORCE"]
+        "-a", "--algorithm", help="Algorithm name", default="NREINFORCE", choices=["NREINFORCE", "QREINFORCE", "PREINFORCE", "TQREINFORCE", "IPG"]
     )
     parser.add_argument(
         "-l", "--rollout-length", help="Number of rollout episodes", default=50, type=int, dest="rollout_length"
@@ -58,6 +58,12 @@ def parse_args(cmd_args=sys.argv[1:]):
     parser.add_argument(
         "-f", "--fix-grid", help="Fix grid configuration", action="store_const", const="MultiGrid-Empty-3x3-TeamCoop", default= "MultiGrid-Empty-3x3-Team", dest="env"
     ) # const = "MultiGrid-Empty-3x3-TeamWins"
+    parser.add_argument(
+        "-eps", "--epsilon", help="Nash Precision", type=float, default=0.01, dest="eps"
+    )
+    parser.add_argument(
+        "-nu", help="Coefficient for lambda in IPGDmax", type=float, default=0.1, dest="nu"
+    )
 
     args, _ = parser.parse_known_args(cmd_args)
 

@@ -66,7 +66,7 @@ class GDmax:
             ep_log_probs = []
             ep_rewards = []
             while True:
-                team_action, team_log_prob = team_policy.get_actions(obs[0])
+                team_action, team_log_prob = team_policy.get_action(obs[0])
                 action = {}
                 for i in range(self.team_size):
                     action[i] = team_action[i]
@@ -101,7 +101,7 @@ class GDmax:
             rewards = []
 
             while True:
-                team_action, team_log_prob = team_policy.get_actions(obs[0])
+                team_action, team_log_prob = team_policy.get_action(obs[0])
                 action = {}
                 
                 for i in range(self.team_size):
@@ -239,7 +239,7 @@ class LGDmax:
             gamma = 1
             obs, _ = self.env.reset()
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                team_action, team_log_prob = self.team_policy.get_action(obs[0])
                 action = {}
                 
                 for i in range(len(team_action)):
@@ -269,7 +269,7 @@ class LGDmax:
             ep_log_probs = []
             ep_rewards = []
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(obs[len(obs)-1])
+                team_action, team_log_prob = self.team_policy.get_action(obs[len(obs)-1])
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
@@ -319,7 +319,7 @@ class LGDmax:
             rewards = []
 
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(obs[0])
+                team_action, team_log_prob = self.team_policy.get_action(obs[0])
                 action = {}
                 
                 for i in range(len(team_action)):

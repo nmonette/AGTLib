@@ -2,6 +2,7 @@ import random
 
 import gymnasium as gym
 import numpy as np
+import torch
 
 # Agent
 # Goal
@@ -136,9 +137,9 @@ class Grid:
             terminated = self.goal1_terminated if i == 0 else self.goal2_terminated
             goals.extend([x, y, 1 if terminated else 0])
 
-        return np.array([
+        return torch.tensor([
             *agents,
             *goals
-        ])
+        ], device="mps")
 
 

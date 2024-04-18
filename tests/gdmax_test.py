@@ -50,7 +50,7 @@ def test_gdmax(env1):
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
+            team_action, _ = team.get_action(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[0]).float())
             action = {i: team_action[i] for i in range(len(team_action))}
             action[len(action)] = adv_action

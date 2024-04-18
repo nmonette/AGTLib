@@ -109,20 +109,20 @@ class IndepdendentTeamWrapper(gym.Wrapper):
         dim = env.unwrapped.grid_size -2 
 
         # Set for adversary in stable_baselines GDmax
-        self.observation_space = gym.spaces.Dict({0:gym.spaces.MultiDiscrete([dim, dim, 2, dim, dim, 2, dim, dim, 2]), 1: gym.spaces.MultiDiscrete([dim, dim, dim, dim, 2, dim, dim, 2]), 2:gym.spaces.MultiDiscrete([dim, dim, 2, dim, dim, 2, dim, dim, 2])})
+        self.observation_space = gym.spaces.Dict({0:gym.spaces.MultiDiscrete([dim, dim, dim, dim, 2, dim, dim, 2]), 1: gym.spaces.MultiDiscrete([dim, dim, dim, dim, 2, dim, dim, 2]), 2:gym.spaces.MultiDiscrete([dim, dim, dim, dim, 2, dim, dim, 2])})
         self.action_space = gym.spaces.Discrete(4)
     
     def reset(self, *args, **kwargs):
         obs, _ = self.env.reset()
         obs = obs[0]
-        new_obs =  {i: np.concatenate((obs[i * 3: i*3 + 3], obs[len(obs) - 6: len(obs)])) for i in range(len(self.observation_space) - 1)}
+        new_obs =  {i: np.concatenate((obs[i * 3: i*3 + 2], obs[len(obs) - 6: len(obs)])) for i in range(len(self.observation_space) - 1)}
         new_obs[len(self.observation_space) - 1] =  obs[[i for i in range(len(obs) - 9, len(obs)) if i != len(obs) - 7]]
         return new_obs, _
     
     def step(self, action: dict):
         obs, reward, done, trunc, _ = self.env.step(action)
         obs = obs[0]
-        new_obs =  {i: np.concatenate((obs[i * 3: i*3 + 3], obs[len(obs) - 6: len(obs)])) for i in range(len(self.observation_space) - 1)}
+        new_obs =  {i: np.concatenate((obs[i * 3: i*3 + 2], obs[len(obs) - 6: len(obs)])) for i in range(len(self.observation_space) - 1)}
         new_obs[len(self.observation_space) - 1] =  obs[[i for i in range(len(obs) - 9, len(obs)) if i != len(obs) - 7]]
     
         if isinstance(trunc, bool):

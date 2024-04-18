@@ -244,7 +244,7 @@ class GDmaxRollout(RolloutManager):
             actions = [defaultdict(lambda: np.ndarray((self.n_envs, ), dtype=np.int32)) for _ in range(self.n_envs)]
 
             adv_action, log_prob = self.policies[0].get_action(adv_obs)
-            team_action, _ = opponent_policy.get_actions(team_obs)
+            team_action, _ = opponent_policy.get_action(team_obs)
             team_translated = torch.tensor(opponent_policy.action_map)[team_action.to(torch.int32)]
 
             actions = []

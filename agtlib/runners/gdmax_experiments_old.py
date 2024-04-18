@@ -33,7 +33,7 @@ def test_reinforce():
         while True:
             team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, _ = team.get_actions(team_obs)
+            team_action, _ = team.get_action(team_obs)
             adv_action, _ = adv.get_action(adv_obs)
             adv_action = adv_action.item()
             team_translated = team.action_map[team_action]
@@ -61,7 +61,7 @@ def test_n_reinforce():
         while True:
             team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, _ = team.get_actions(team_obs)
+            team_action, _ = team.get_action(team_obs)
             adv_action, _ = adv.get_action(adv_obs)
             adv_action = adv_action.item()
             team_translated = team.action_map[team_action]
@@ -135,7 +135,7 @@ def q_reinforce_experiment():
         while True:
             team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, _ = team.get_actions(team_obs)
+            team_action, _ = team.get_action(team_obs)
             adv_action, _ = adv.get_action(adv_obs)
             adv_action = adv_action.item()
             team_translated = team.action_map[team_action]
@@ -214,7 +214,7 @@ def n_reinforce_experiment():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
+            team_action, _ = team.get_action(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
             # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
@@ -281,7 +281,7 @@ def reinforce_experiment():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
+            team_action, _ = team.get_action(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
             # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
@@ -368,7 +368,7 @@ def gdmax_experiment():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
+            team_action, _ = team.get_action(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
             action = {i: team_action[i] for i in range(len(team_action))}
@@ -428,7 +428,7 @@ def gdmax_experiment():
     #     print("reset")
     #     # env.render()
     #     while True:
-    #         team_action, _ = team.get_actions(obs[0])
+    #         team_action, _ = team.get_action(obs[0])
     #         adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
     #         # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
     #         action = {i: team_action[i] for i in range(len(team_action))}
@@ -465,7 +465,7 @@ def lgdmax_grid_experiment():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
+            team_action, _ = team.get_action(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
             # print(torch.nn.Softmax()(adv.__call__(torch.tensor(obs[0]).float())))
@@ -523,7 +523,7 @@ def nlgdmax_grid_experiment():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
+            team_action, _ = team.get_action(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
             action = {i: team_action[i] for i in range(len(team_action))}
@@ -546,7 +546,7 @@ def test_lgdmax_weights():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
+            team_action, _ = team.get_action(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
             action = {i: team_action[i] for i in range(len(team_action))}

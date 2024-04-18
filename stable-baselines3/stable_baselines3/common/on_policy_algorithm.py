@@ -204,7 +204,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             new_actions = clipped_actions
             # Add in GDmax team 
             if opponent_policy is not None:
-                team_action = opponent_policy.get_actions(team_obs)[0].int()
+                team_action = opponent_policy.get_action(team_obs)[0].int()
                 team_translated = np.array(opponent_policy.action_map)[team_action]
                 new_actions = []
                 for i in range(len(actions)):

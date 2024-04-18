@@ -50,7 +50,7 @@ def test_squashed_gaussian(model_class):
     dist = SquashedDiagGaussianDistribution(N_ACTIONS)
     _, log_std = dist.proba_distribution_net(N_FEATURES)
     dist = dist.proba_distribution(gaussian_mean, log_std)
-    actions = dist.get_actions()
+    actions = dist.get_action()
     assert th.max(th.abs(actions)) <= 1.0
 
 
@@ -105,7 +105,7 @@ def test_sde_distribution():
     dist.sample_weights(log_std, batch_size=N_SAMPLES)
 
     dist = dist.proba_distribution(deterministic_actions, log_std, state)
-    actions = dist.get_actions()
+    actions = dist.get_action()
 
     assert th.allclose(actions.mean(), dist.distribution.mean.mean(), rtol=2e-3)
     assert th.allclose(actions.std(), dist.distribution.scale.mean(), rtol=2e-3)
@@ -133,7 +133,7 @@ def test_entropy(dist):
         dist.sample_weights(log_std, batch_size=N_SAMPLES)
         dist = dist.proba_distribution(deterministic_actions, log_std, state)
 
-    actions = dist.get_actions()
+    actions = dist.get_action()
     entropy = dist.entropy()
     log_prob = dist.log_prob(actions)
     assert th.allclose(entropy.mean(), -log_prob.mean(), rtol=5e-3)
@@ -153,7 +153,7 @@ def test_categorical(dist, CAT_ACTIONS):
     set_random_seed(1)
     action_logits = th.rand(N_SAMPLES, CAT_ACTIONS)
     dist = dist.proba_distribution(action_logits)
-    actions = dist.get_actions()
+    actions = dist.get_action()
     entropy = dist.entropy()
     log_prob = dist.log_prob(actions)
     assert th.allclose(entropy.mean(), -log_prob.mean(), rtol=5e-3)
@@ -211,7 +211,7 @@ def test_kl_divergence(dist_type):
         dist2 = dist2.proba_distribution(mean_actions2, log_std, state)
 
     full_kl_div = kl_divergence(dist1, dist2).mean(dim=0)
-    actions = dist1.get_actions()
+    actions = dist1.get_action()
     approx_kl_div = (dist1.log_prob(actions) - dist2.log_prob(actions)).mean(dim=0)
 
     assert th.allclose(full_kl_div, approx_kl_div, rtol=5e-2)

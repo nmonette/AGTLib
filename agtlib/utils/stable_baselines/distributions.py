@@ -77,7 +77,7 @@ class Distribution(ABC):
         :return: the stochastic action
         """
 
-    def get_actions(self, deterministic: bool = False) -> th.Tensor:
+    def get_action(self, deterministic: bool = False) -> th.Tensor:
         """
         Return actions according to the probability distribution.
 
@@ -188,7 +188,7 @@ class DiagGaussianDistribution(Distribution):
     def actions_from_params(self, mean_actions: th.Tensor, log_std: th.Tensor, deterministic: bool = False) -> th.Tensor:
         # Update the proba distribution
         self.proba_distribution(mean_actions, log_std)
-        return self.get_actions(deterministic=deterministic)
+        return self.get_action(deterministic=deterministic)
 
     def log_prob_from_params(self, mean_actions: th.Tensor, log_std: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         """
@@ -303,7 +303,7 @@ class CategoricalDistribution(Distribution):
     def actions_from_params(self, action_logits: th.Tensor, deterministic: bool = False) -> th.Tensor:
         # Update the proba distribution
         self.proba_distribution(action_logits)
-        return self.get_actions(deterministic=deterministic)
+        return self.get_action(deterministic=deterministic)
 
     def log_prob_from_params(self, action_logits: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         actions = self.actions_from_params(action_logits)
@@ -360,7 +360,7 @@ class MultiCategoricalDistribution(Distribution):
     def actions_from_params(self, action_logits: th.Tensor, deterministic: bool = False) -> th.Tensor:
         # Update the proba distribution
         self.proba_distribution(action_logits)
-        return self.get_actions(deterministic=deterministic)
+        return self.get_action(deterministic=deterministic)
 
     def log_prob_from_params(self, action_logits: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         actions = self.actions_from_params(action_logits)
@@ -410,7 +410,7 @@ class BernoulliDistribution(Distribution):
     def actions_from_params(self, action_logits: th.Tensor, deterministic: bool = False) -> th.Tensor:
         # Update the proba distribution
         self.proba_distribution(action_logits)
-        return self.get_actions(deterministic=deterministic)
+        return self.get_action(deterministic=deterministic)
 
     def log_prob_from_params(self, action_logits: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         actions = self.actions_from_params(action_logits)
@@ -607,7 +607,7 @@ class StateDependentNoiseDistribution(Distribution):
     ) -> th.Tensor:
         # Update the proba distribution
         self.proba_distribution(mean_actions, log_std, latent_sde)
-        return self.get_actions(deterministic=deterministic)
+        return self.get_action(deterministic=deterministic)
 
     def log_prob_from_params(
         self, mean_actions: th.Tensor, log_std: th.Tensor, latent_sde: th.Tensor

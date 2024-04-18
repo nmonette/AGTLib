@@ -1,6 +1,7 @@
 from typing import Any
 
 import gymnasium as gym
+import torch as torch
 import numpy as np
 
 from .grid import Grid
@@ -14,7 +15,7 @@ class TeamEmptyEnv(gym.Env):
         self.max_episode_steps = max_episode_steps
         self.num_agents_t1 = num_agents_t1
         self.num_agents_t2 = num_agents_t2
-        self.available_coord_pairs = np.array([(i,j) for i in range(0,dim) for j in range(0,dim)])
+        self.available_coord_pairs = torch.tensor([(i,j) for i in range(0,dim) for j in range(0,dim)])
 
         self.observation_space = gym.spaces.MultiDiscrete([dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2])
         self.action_space = gym.spaces.Discrete(4)

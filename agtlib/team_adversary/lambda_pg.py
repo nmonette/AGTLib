@@ -151,7 +151,7 @@ class NLGDmax:
 
             rewards = []
             while True:
-                team_action, team_log_prob = self.team_policy.get_actions(torch.tensor(obs[0]).float())
+                team_action, team_log_prob = self.team_policy.get_action(torch.tensor(obs[0]).float())
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
@@ -225,7 +225,7 @@ class NLGDmax:
             adv_rewards = []
             gamma = 1
             while True:
-                team_action, team_log_prob = team_policy.get_actions(obs[0])
+                team_action, team_log_prob = team_policy.get_action(obs[0])
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
@@ -259,7 +259,7 @@ class NLGDmax:
             rewards = []
 
             while True:
-                team_action, team_log_prob = team_policy.get_actions(obs[0])
+                team_action, team_log_prob = team_policy.get_action(obs[0])
                 action = {}
                 
                 for i in range(len(team_action)):

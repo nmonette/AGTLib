@@ -53,7 +53,7 @@ class GDmax:
         env = self.env
         obs, _ = env.reset()
         while True:
-            team_action, team_log_prob = team_policy.get_actions(obs[0])
+            team_action, team_log_prob = team_policy.get_action(obs[0])
             action = {}
             for i in range(len(team_action)):
                 action[i] = team_action[i]
@@ -103,7 +103,7 @@ class GDmax:
             while True:
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-                team_action, team_log_prob = team_policy.get_actions(team_obs)
+                team_action, team_log_prob = team_policy.get_action(team_obs)
                 team_translated = team_policy.action_map[team_action]
                 action = {}
                 for i in range(len(team_translated)):
@@ -198,7 +198,7 @@ class NGDmax(GDmax):
         while True:
             team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, team_log_prob = team_policy.get_actions(team_obs)
+            team_action, team_log_prob = team_policy.get_action(team_obs)
             team_translated = team_policy.action_map[team_action]
             action = {}
             for i in range(len(team_translated)):
@@ -374,7 +374,7 @@ class TQGDmax(QGDmax):
             team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, team_log_prob = team_policy.get_actions([team_obs1, team_obs2])
+            team_action, team_log_prob = team_policy.get_action([team_obs1, team_obs2])
             action = {}
             for i in range(len(team_action)):
                 action[i] = team_action[i]
@@ -423,13 +423,13 @@ class TQGDmax(QGDmax):
             team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
             adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, team_log_prob = self.team_policy.get_actions([team_obs1, team_obs2])
+            team_action, team_log_prob = self.team_policy.get_action([team_obs1, team_obs2])
             action = {}
             for i in range(len(team_action)):
                 action[i] = team_action[i]
             adv_action, adv_log_prob = self.adv_policy.get_action(adv_obs)
             action[i+1] = adv_action.item()
-            action[policy_idx], policy_log_prob = policy.get_actions(torch.tensor(obs[policy_idx], device="cpu", dtype=torch.float32))
+            action[policy_idx], policy_log_prob = policy.get_action(torch.tensor(obs[policy_idx], device="cpu", dtype=torch.float32))
             obs, reward, done, trunc, _ = env.step(action) 
             
             log_probs.append(policy_log_prob)
@@ -467,7 +467,7 @@ class TQGDmax(QGDmax):
                 team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-                team_action, team_log_prob = team_policy.get_actions([team_obs1, team_obs2])
+                team_action, team_log_prob = team_policy.get_action([team_obs1, team_obs2])
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
@@ -546,7 +546,7 @@ class PGDmax(NGDmax):
         while True:
             team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
             adv_obs = obs_as_tensor(obs[len(obs) - 1], self.ppo_args["device"]).reshape(-1, 8) #  torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-            team_action, team_log_prob = team_policy.get_actions(team_obs)
+            team_action, team_log_prob = team_policy.get_action(team_obs)
             team_translated = team_policy.action_map[team_action]
             action = {}
             for i in range(len(team_translated)):
@@ -599,7 +599,7 @@ class PGDmax(NGDmax):
             while True:
                 team_obs = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
                 adv_obs = obs_as_tensor(obs[len(obs) - 1], self.ppo_args["device"]).reshape(-1, 8) #  torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
-                team_action, team_log_prob = team_policy.get_actions(team_obs)
+                team_action, team_log_prob = team_policy.get_action(team_obs)
                 team_translated = team_policy.action_map[team_action]
                 action = {}
                 for i in range(len(team_translated)):

@@ -42,7 +42,7 @@ def test_lgdmax_weights():
         obs, _ = env.reset()
         env.render()
         while True:
-            team_action, _ = team.get_actions(obs[0])
+            team_action, _ = team.get_action(obs[0])
             adv_action, _ = adv.get_action(torch.tensor(obs[len(obs)-1]).float())
             adv_action = adv_action.item()
             action = {i: team_action[i] for i in range(len(team_action))}

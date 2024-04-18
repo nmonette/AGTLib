@@ -88,7 +88,7 @@ class TabularQ:
             while True:
                 team_obs = [torch.tensor(obs[0], device="cpu", dtype=torch.float32), torch.tensor(obs[1], device="cpu", dtype=torch.float32)]
                 adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.int)
-                team_translated, _ = opponent_policy.get_actions(team_obs)
+                team_translated, _ = opponent_policy.get_action(team_obs)
                 adv_action, _ = self.get_action(adv_obs)
                 adv_action = adv_action.item()
                 # team_translated = opponent_policy.action_map[team_action]

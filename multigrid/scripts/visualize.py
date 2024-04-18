@@ -9,7 +9,7 @@ from typing import Any, Callable, Iterable
 
 
 
-def get_actions(
+def get_action(
     agent_ids: Iterable[AgentID],
     algorithm: Algorithm,
     policy_mapping_fn: Callable[[AgentID], str],

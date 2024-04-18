@@ -397,7 +397,7 @@ class SoftmaxPolicy(nn.Module):
         # [dim,dim, 2, dim,dim, 2, dim,dim, 2, dim, dim, 2, dim ,dim, 2, 16]
         return self.params[*x.int(), :]
 
-    def get_actions(self, x):
+    def get_action(self, x):
         dist = torch.distributions.Categorical(logits=self.__call__(x)) # make categorical distribution and then decode the action index
         action = dist.sample()
         log_prob = dist.log_prob(action)
@@ -425,14 +425,14 @@ class DirectPolicy(nn.Module):
         nn.init.orthogonal_(empty)
         self.params = nn.Parameter(project_simplex(empty), requires_grad=True)
         
-        self.t = torch.ones((1, ))
+        self.t = 1
 
         # self.optimizer = torch.optim.Adam([self.params])
 
     def forward(self, x):
         return self.params[*x.int(), :]
     
-    def get_actions(self, x):
+    def get_action(self, x):
         dist = torch.distributions.Categorical(logits=self.__call__(x)) # make categorical distribution and then decode the action index
         action = dist.sample()
         log_prob = dist.log_prob(action)
@@ -441,7 +441,8 @@ class DirectPolicy(nn.Module):
     def step(self, loss):
         loss.backward(inputs=(self.params,)) # inputs=(self.params,)
 
-        self.params.data = project_simplex(self.params - (30 * self.lr / torch.sqrt(self.t)) * self.params.grad)
+        # do we have to do truncated simplex for the team?
+        self.params.data = project_simplex(self.params - (30 * self.lr / np.sqrt(self.t)) * self.params.grad)
         self.params.grad.zero_()
 
         self.t += 1
@@ -451,13 +452,13 @@ class IndependentDirectPolicy(nn.Module):
         super(IndependentDirectPolicy, self).__init__()
         self.policies = nn.ModuleList([DirectPolicy(n_actions, param_dims, lr) for _ in range(n_agents)])
     
-    def get_actions(self, x):
+    def get_action(self, x):
 
         log_probs = []
         actions = []
 
         for i in range(len(self.policies)):
-            action, log_prob = self.policies[i].get_actions(x[i])
+            action, log_prob = self.policies[i].get_action(x[i])
             log_probs.append(log_prob)
             actions.append(action)
 
@@ -473,14 +474,14 @@ class IndependentSoftmaxPolicy(nn.Module):
         super(IndependentDirectPolicy, self).__init__()
         self.policies = nn.ModuleList([SoftmaxPolicy(1, n_agents, param_dims, lr) for _ in range(n_agents)])
     
-    def get_actions(self, x):
+    def get_action(self, x):
 
         log_probs = []
         actions = []
 
         for i in range(len(self.policies)):
             temp_obs = torch.tensor(x[i], dtype=torch.float32)
-            action, log_prob = self.policies[i].get_actions(temp_obs)
+            action, log_prob = self.policies[i].get_action(temp_obs)
             log_probs.append(log_prob)
             actions.append(action)
 
@@ -535,7 +536,7 @@ class MAPolicyNetwork(nn.Module):
             x = self.relu(self.layers[i](x))
         return self.layers[-1](x)
 
-    def get_actions(self, x: torch.Tensor) -> int:
+    def get_action(self, x: torch.Tensor) -> int:
         """
         Samples an action from the current policy and returns it as an integer index.
         Parameters
@@ -626,7 +627,7 @@ class SELUMAPolicy(nn.Module):
             obs = self.selu(self.layers[i](obs))
         return self.layers[-1](obs)
 
-    def get_actions(self, x: torch.Tensor) -> int:
+    def get_action(self, x: torch.Tensor) -> int:
         """
         Samples an action from the current policy and returns it as an integer index.
         Parameters

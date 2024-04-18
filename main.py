@@ -4,10 +4,10 @@ from agtlib.runners.parse_args import parse_args
 from agtlib.runners.gdmax_experiments import eval, train
 from agtlib.team_adversary.reinforce import GDmax, NGDmax as NREINFORCE, QGDmax as QREINFORCE, PGDmax as PREINFORCE #, TQGDmax as TQREINFORCE
 from agtlib.team_adversary.independent import TQGDmax as TQREINFORCE
-from agtlib.common.base import SELUPolicy, SELUMAPolicy, SoftmaxPolicy, IndependentDirectPolicy as IDPolicy
+from agtlib.team_adversary.ipg import IPGDmax, TruncDirectPolicy 
+from agtlib.common.base import SELUPolicy, SELUMAPolicy, IndependentDirectPolicy as IDPolicy
 from agtlib.team_adversary.q import TabularQ
 from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper, IndepdendentTeamWrapper
-from agtlib.cooperative.ppo import train_ppo
 
 from stable_baselines3 import PPO
 import gymnasium as gym
@@ -114,6 +114,30 @@ def main(cmd_args=sys.argv[1:]):
 
             if not args.disable_eval:
                 eval(alg.team_policy, alg.adv_policy, args=args)
+
+    elif args.algorithm == "IPG":
+        dim = args.dim
+        if args.eval:
+            team = IDPolicy(2, 4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, 4], args.lr)
+            team.load_state_dict(torch.load(args.team))
+
+            adv = TruncDirectPolicy(4, [dim, dim, 2, dim, dim, 2, dim, dim, 2, 4], args.lr, args.eps)
+            adv.load_state_dict(torch.load(args.adv))
+
+            eval(team, adv, args)
+        else:
+            env = IndepdendentTeamWrapper(gym.make("TreasureHunt-3x3-Team", dim = dim, disable_env_checker=True)) # IndepdendentTeamWrapper(gym.make(args.env,  agents=3, size = dim + 2, disable_env_checker=True))
+            alg = IPGDmax(env, 4, 3, args.lr, args.lr, args.gamma, [dim, dim, dim, dim, 2, dim, dim, 2, 4], args.br_length, args.eps, args.rollout_length, args.nu)
+            if args.adv is not None:
+                alg.adv_policy.load_state_dict(torch.load(args.adv))
+            if args.team is not None:
+                alg.team_policy.load_state_dict(torch.load(args.team))
+            
+            train(alg, args)
+
+            if not args.disable_eval:
+                eval(alg.team_policy, alg.adv_policy, args=args)
+
     else:
         raise NotImplemented
     
