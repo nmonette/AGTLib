@@ -124,3 +124,29 @@ def project_simplex_2(x, mask=None):
     if mask is not None:
         p[mask] = x[mask]
     return torch.tensor(p)
+
+def projection_simplex_truncated(x: torch.Tensor, eps: float) -> torch.Tensor: 
+    """
+    Code adapted from 
+    https://www.ryanhmckenna.com/2019/10/projecting-onto-probability-simplex.html
+    To represent truncated simplex projection. Assumes 1D vector. 
+    """
+    ones = torch.ones_like(x)
+    lambdas = torch.concat((ones * eps - x, ones - x), dim=-1)
+    idx = torch.argsort(lambdas)
+    lambdas = lambdas.gather(-1, idx)
+    active = torch.cumsum((idx < x.size(-1)) * 2 - 1, dim=-1)[..., :-1]
+    diffs = torch.diff(lambdas, n=1, dim=-1)
+    left = (ones * eps).sum(dim=-1)
+    left = left.reshape(*left.shape, 1)
+    totals = left + torch.cumsum(active*diffs, dim=-1)
+    i = torch.searchsorted(totals, torch.ones_like(left))
+    lam = (1 - totals.gather(-1, i)) / active.gather(-1, i) + lambdas.gather(-1, i+1)
+    return torch.clamp(x + lam, eps, 1)
+
+if __name__ == "__main__":
+    x = torch.rand((4,4,2,4,4,2,4,4,2,4,4,2,4))
+    print(projection_simplex_truncated(x, 0.1).sum(-1))
+    
+    # x = torch.tensor([1/3, 2/3, 0])
+    # print(sum(projection_simplex_truncated(x, 0.1)))

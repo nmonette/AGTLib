@@ -449,7 +449,7 @@ class DirectPolicy(nn.Module):
 class IndependentDirectPolicy(nn.Module):
     def __init__(self, n_agents, n_actions, param_dims, lr= 0.01):
         super(IndependentDirectPolicy, self).__init__()
-        self.policies = nn.ModuleList([DirectPolicy(4, param_dims, lr) for _ in range(n_agents)])
+        self.policies = nn.ModuleList([DirectPolicy(n_actions, param_dims, lr) for _ in range(n_agents)])
     
     def get_actions(self, x):
 

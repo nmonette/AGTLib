@@ -74,11 +74,13 @@ def train(alg, args):
     if not args.disable_save:
         experiment_num = len(list(os.walk('./output')))
         os.makedirs(f"output/experiment-{experiment_num}")
-    def save(iteration="end"):
+    def save(iteration="end", x = None):
         if args.nash_gap:
             plt.xlabel("Iterations")
             plt.ylabel("Nash Gap")
-            plt.plot(range(0, len(alg.nash_gap)), alg.nash_gap)
+
+            plt.plot(x, alg.nash_gap)
+
             plt.savefig(f"output/experiment-{experiment_num}/"+ str(iteration) + "-nashgap.png")
             plt.close()
 
@@ -94,11 +96,13 @@ def train(alg, args):
         torch.save(adv.state_dict() if args.algorithm not in ["QREINFORCE", "TQREINFORCE"] else adv.qpolicy.table, f"output/experiment-{experiment_num}/" + str(iteration) + "-adv-policy.pt")
     
     time_taken_sum = 0
+    xlst = []
     for i in range(1, args.iters + 1):
         x = time()
         if args.nash_gap and (i % args.metric_interval == 0 or i == 1): 
             alg.step_with_gap()
             print(f"Nash Gap: {alg.nash_gap[-1]:.6f}")
+            xlst.append(i)
         else:
             alg.step() 
 
@@ -109,8 +113,8 @@ def train(alg, args):
         if i % args.save_interval == 0  and i > 0 and not args.disable_save:
             # Save progress
             print("Saving progress...")
-            save(i)
+            save(i, xlst)
     
     if not args.disable_save:    
         print("Saving progress...")  
-        save()
+        save(xlst=xlst)
