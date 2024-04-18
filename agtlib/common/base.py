@@ -421,9 +421,12 @@ class DirectPolicy(nn.Module):
         self.n_actions = n_actions
         self.param_dims = param_dims
 
-        empty = torch.empty(*param_dims)
-        nn.init.orthogonal_(empty)
-        self.params = nn.Parameter(project_simplex(empty), requires_grad=True)
+        # empty = torch.empty(*param_dims)
+        # nn.init.orthogonal_(empty)
+        # self.params = nn.Parameter(project_simplex(empty), requires_grad=True)
+
+        uniform = torch.ones(param_dims) * (1 / n_actions)
+        self.params = nn.Parameter(uniform, requires_grad=True)
         
         self.t = 1
 

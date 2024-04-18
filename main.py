@@ -4,7 +4,7 @@ from agtlib.runners.parse_args import parse_args
 from agtlib.runners.gdmax_experiments import eval, train
 from agtlib.team_adversary.reinforce import GDmax, NGDmax as NREINFORCE, QGDmax as QREINFORCE, PGDmax as PREINFORCE #, TQGDmax as TQREINFORCE
 from agtlib.team_adversary.independent import TQGDmax as TQREINFORCE
-from agtlib.team_adversary.ipg import IPGDmax, TruncDirectPolicy 
+from agtlib.team_adversary.ipg_vec import IPGDmax, TruncDirectPolicy 
 from agtlib.common.base import SELUPolicy, SELUMAPolicy, IndependentDirectPolicy as IDPolicy
 from agtlib.team_adversary.q import TabularQ
 from agtlib.utils.env import MultiGridWrapper, DecentralizedMGWrapper, IndepdendentTeamWrapper
@@ -13,6 +13,8 @@ from stable_baselines3 import PPO
 import gymnasium as gym
 import torch
 import multigrid.multigrid.envs
+
+torch.set_default_device("cpu")
 
 def main(cmd_args=sys.argv[1:]):
     args = parse_args(cmd_args)
@@ -126,7 +128,7 @@ def main(cmd_args=sys.argv[1:]):
 
             eval(team, adv, args)
         else:
-            env = IndepdendentTeamWrapper(gym.make("TreasureHunt-3x3-Team", dim = dim, disable_env_checker=True)) # IndepdendentTeamWrapper(gym.make(args.env,  agents=3, size = dim + 2, disable_env_checker=True))
+            env = IndepdendentTeamWrapper(gym.make(args.env,  agents=3, size = dim + 2, disable_env_checker=True))
             alg = IPGDmax(env, 4, 3, args.lr, args.lr, args.gamma, [dim, dim, dim, dim, 2, dim, dim, 2, 4], args.br_length, args.eps, args.rollout_length, args.nu)
             if args.adv is not None:
                 alg.adv_policy.load_state_dict(torch.load(args.adv))

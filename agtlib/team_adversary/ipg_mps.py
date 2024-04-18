@@ -47,8 +47,8 @@ class IPGDmax:
         self.team_args = (num_agents - 1, num_actions, param_dims, team_lr)
         self.adv_args = (num_actions, param_dims, adv_lr, eps)
 
-        self.team_policy = IndependentDirectPolicy(*self.team_args)
-        self.adv_policy = TruncDirectPolicy(*self.adv_args)
+        self.team_policy = IndependentDirectPolicy(*self.team_args).to("mps")
+        self.adv_policy = TruncDirectPolicy(*self.adv_args).to("mps")
 
         self.env = env
 
@@ -56,7 +56,7 @@ class IPGDmax:
 
     def update_adv(self, policy):
         log_probs = []
-        lambda_ = torch.zeros(self.param_dims)
+        lambda_ = torch.zeros(self.param_dims, device="mps")
         rewards = []
         actions = []
         states = []
@@ -64,7 +64,7 @@ class IPGDmax:
 
         for episode in range(self.num_rollouts):
             episode_log_probs = []
-            episode_lambda = torch.zeros(self.param_dims)
+            episode_lambda = torch.zeros(self.param_dims, device="mps")
             episode_rewards = []
             episode_actions = []
             episode_states = []
@@ -73,22 +73,22 @@ class IPGDmax:
             gamma = 1
             t = 0
             while True:
-                team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-                team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
-                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+                team_obs1 = torch.tensor(obs[0], device="mps", dtype=torch.float32)
+                team_obs2 = torch.tensor(obs[1], device="mps", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
                 team_action, _ = self.team_policy.get_action([team_obs1, team_obs2])
                 action = {}
                 for i in range(len(team_action)):
                     action[i] = team_action[i]
                 adv_action, adv_log_prob = policy.get_action(adv_obs)
-                action[i+1] = adv_action.item()
+                action[i+1] = adv_action
                 obs, reward, done, trunc, _ = self.env.step(action) 
 
                 episode_log_probs.append(adv_log_prob)
                 episode_rewards.append(reward[len(obs) - 1])
                 episode_actions.append(adv_action)
                 episode_states.append(adv_obs.int())
-                step_lambda = torch.zeros_like(episode_lambda, device="cpu")
+                step_lambda = torch.zeros_like(episode_lambda, device="mps")
                 step_lambda[*obs[len(obs) - 1].astype(int), adv_action] = gamma
                 gamma *= self.gamma
 
@@ -99,7 +99,7 @@ class IPGDmax:
 
             log_probs.append(episode_log_probs)
             lambda_ += episode_lambda
-            rewards.append(torch.tensor(episode_rewards, device="cpu"))
+            rewards.append(torch.tensor(episode_rewards, device="mps"))
             actions.append(episode_actions)
             states.append(episode_states)
             dones.append(t)
@@ -125,9 +125,9 @@ class IPGDmax:
 
         obs, _ = env.reset()
         while True:
-            team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-            team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
-            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+            team_obs1 = torch.tensor(obs[0], device="mps", dtype=torch.float32)
+            team_obs2 = torch.tensor(obs[1], device="mps", dtype=torch.float32)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
             team_action, team_log_prob = self.team_policy.get_action([team_obs1, team_obs2])
             action = {}
             for i in range(len(team_action)):
@@ -146,7 +146,7 @@ class IPGDmax:
             returns.append(self.gamma * returns[-1] + rewards[-i])
 
         log_prob_data = torch.stack(log_probs)
-        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32, device="cpu").flip(-1)
+        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32, device="mps").flip(-1)
 
         loss1 = -torch.dot(log_prob_data[:, 0].flatten(), return_data) / len(returns)
         loss2 = -torch.dot(log_prob_data[:, 1].flatten(), return_data.clone()) / len(returns)
@@ -160,16 +160,16 @@ class IPGDmax:
 
         obs, _ = env.reset()
         while True:
-            team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-            team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
-            adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+            team_obs1 = torch.tensor(obs[0], device="mps", dtype=torch.float32)
+            team_obs2 = torch.tensor(obs[1], device="mps", dtype=torch.float32)
+            adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
             team_action, team_log_prob = self.team_policy.get_action([team_obs1, team_obs2])
             action = {}
             for i in range(len(team_action)):
                 action[i] = team_action[i]
             adv_action, adv_log_prob = self.adv_policy.get_action(adv_obs)
             action[i+1] = adv_action.item()
-            action[policy_idx], policy_log_prob = policy.get_action(torch.tensor(obs[policy_idx], device="cpu", dtype=torch.float32))
+            action[policy_idx], policy_log_prob = policy.get_action(torch.tensor(obs[policy_idx], device="mps", dtype=torch.float32))
             obs, reward, done, trunc, _ = env.step(action) 
             
             log_probs.append(policy_log_prob)
@@ -183,7 +183,7 @@ class IPGDmax:
             returns.append(self.gamma * returns[-1] + rewards[-i])
 
         log_prob_data = torch.stack(log_probs)
-        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32, device="cpu").flip(-1)
+        return_data = torch.tensor(returns, requires_grad=False, dtype=torch.float32, device="mps").flip(-1)
 
         loss = -torch.dot(log_prob_data, return_data) / len(returns)
 
@@ -204,9 +204,9 @@ class IPGDmax:
             temp_adv_rewards = []
             temp_team_rewards = []
             while True:
-                team_obs1 = torch.tensor(obs[0], device="cpu", dtype=torch.float32)
-                team_obs2 = torch.tensor(obs[1], device="cpu", dtype=torch.float32)
-                adv_obs = torch.tensor(obs[len(obs) - 1], device="cpu", dtype=torch.float32)
+                team_obs1 = torch.tensor(obs[0], device="mps", dtype=torch.float32)
+                team_obs2 = torch.tensor(obs[1], device="mps", dtype=torch.float32)
+                adv_obs = torch.tensor(obs[len(obs) - 1], device="mps", dtype=torch.float32)
                 team_action, team_log_prob = team_policy.get_action([team_obs1, team_obs2])
                 action = {}
                 for i in range(len(team_action)):
@@ -227,7 +227,7 @@ class IPGDmax:
         return torch.mean(torch.tensor(adv_rewards), dtype=torch.float32), torch.mean(torch.tensor(team_rewards, dtype=torch.float32))
     
     def get_adv_br(self):
-        temp_adv = TruncDirectPolicy(*self.adv_args)
+        temp_adv = TruncDirectPolicy(*self.adv_args).to("mps")
         temp_adv.load_state_dict(self.adv_policy.state_dict())
 
         for _ in range(self.br):
@@ -237,7 +237,7 @@ class IPGDmax:
     
 
     def get_team_br(self, policy_idx):
-        temp_team = IndependentDirectPolicy(*self.team_args)
+        temp_team = IndependentDirectPolicy(*self.team_args).to("mps")
         temp_team.load_state_dict(self.team_policy.state_dict())
 
         for _ in range(self.br):

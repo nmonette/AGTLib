@@ -99,7 +99,7 @@ class IPGDmax:
 
             log_probs.append(episode_log_probs)
             lambda_ += episode_lambda
-            rewards.append(torch.tensor(episode_rewards, device="cpu"))
+            rewards.append(episode_rewards)
             actions.append(episode_actions)
             states.append(episode_states)
             dones.append(t)
@@ -107,15 +107,28 @@ class IPGDmax:
         
         lambda_ /= self.num_rollouts
 
-        returns = []
-        for i in range(len(dones)):
-            start_return = (rewards[i][-1] - self.nu * lambda_[*states[i][-1], actions[i][-1]]) * sum(log_probs[i])
-            for j in range(2, dones[i]+1):
-                start_return += (rewards[i][-j] - self.nu * lambda_[*states[i][-j], actions[i][-j]]) * sum(log_probs[i][:-j])
-                
-            returns.append(start_return)
+        def get_return(r, s, a, lp, d):
+            fn = lambda r, s, l, a, lp: (r - self.nu * l) * lp
+            # r = torch.tensor(rewards[i])
+            # s = torch.stack(states[i])
+            # a = torch.stack(actions[i])
+            idx = torch.cat((s, a.view(-1, 1)), dim=1)
+            lambdas = lambda_[*idx.T]
+            lp = torch.where(torch.arange(len(lp)) < d, torch.cumsum(lp, -1), 0)
+            # lp = torch.cumsum(torch.stack(log_probs[i]), -1)
+            
+            return torch.sum(torch.vmap(fn, in_dims=(0,0,0,0,0))(r,s,lambdas,a,lp))      
+        
+        r = nn.utils.rnn.pad_sequence([torch.tensor(i) for i in rewards])
+        s = nn.utils.rnn.pad_sequence([torch.stack(i) for i in states])
+        a = nn.utils.rnn.pad_sequence([torch.stack(i) for i in actions])
+        lp = nn.utils.rnn.pad_sequence([torch.stack(i) for i in log_probs])
+        d = torch.tensor(dones)
+             
+        returns = torch.vmap(get_return)(r.T, s.view(s.shape[1], s.shape[0], s.shape[2]), a.T, lp.T, d)
 
-        loss = -torch.stack(returns).mean()
+        # loss = -torch.stack(returns).mean()
+        loss = -returns.mean()
         policy.step(loss)
 
     def update_team(self):
@@ -188,7 +201,6 @@ class IPGDmax:
         loss = -torch.dot(log_prob_data, return_data) / len(returns)
 
         policy.step(loss)
-
 
     def get_utility(self, team_policy=None, adv_policy=None):
         team_rewards = []
